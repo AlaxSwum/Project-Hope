@@ -224,7 +224,7 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
       const result = await improvedLocationService.checkWorkLocation(
         branchLocation.latitude,
         branchLocation.longitude,
-        branchLocation.radius_meters
+        branchLocation.radius_meters || 50
       );
 
       if (result) {
@@ -450,7 +450,7 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
       return improvedLocationService.getLocationStatusMessage(
         locationStatus.withinRadius,
         locationStatus.distance,
-        branchLocation.radius_meters
+        branchLocation.radius_meters || 50
       );
     }
     
@@ -650,7 +650,7 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
         ) : (
           <button
             onClick={handleClockIn}
-            disabled={loading || !userBranchId || !locationStatus.hasPermission}
+            disabled={loading || !userBranchId}
             className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-3 md:py-4 px-4 md:px-6 rounded-lg transition-colors flex items-center justify-center space-x-2 text-base md:text-lg"
           >
             {loading ? (
