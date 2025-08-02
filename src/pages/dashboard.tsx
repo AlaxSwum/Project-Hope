@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { authService, userService, supabase } from '../lib/supabase-secure';
 import { checklistService, timeTrackingService } from '../lib/supabase';
-import ClockInOut from '../components/ClockInOut';
+import ImprovedClockInOut from '../components/ImprovedClockInOut';
 
 const Dashboard: NextPage = () => {
   const router = useRouter();
@@ -717,7 +717,7 @@ const Dashboard: NextPage = () => {
 
                   {/* Clock In/Out Widget */}
                   <div className="max-w-md mx-auto">
-                    <ClockInOut 
+                    <ImprovedClockInOut 
                       userId={currentUser?.id} 
                       userBranchId={userBranchId}
                     />
