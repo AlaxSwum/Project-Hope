@@ -165,7 +165,42 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
     setRequestingPermission(true);
     setShowPermissionDialog(false);
 
+    // Reset previous permission state to force fresh check
+    setLocationStatus(prev => ({
+      ...prev,
+      hasPermission: false,
+      needsPermission: true,
+      error: undefined,
+      withinRadius: false,
+      distance: undefined,
+      accuracy: undefined
+    }));
+
     try {
+      console.log('🔄 Refreshing location permission status...');
+      
+      // First check current permission status
+      const permissionState = await improvedLocationService.checkPermissionStatus();
+      console.log('📋 Permission state:', permissionState);
+      
+      // If permission is already granted, just get location
+      if (permissionState.granted) {
+        console.log('✅ Permission already granted, getting location...');
+        setLocationStatus(prev => ({
+          ...prev,
+          hasPermission: true,
+          needsPermission: false
+        }));
+        
+        // Get location immediately
+        setTimeout(() => {
+          checkUserLocation();
+        }, 100);
+        
+        return true;
+      }
+      
+      // Otherwise request fresh permission
       const result = await improvedLocationService.requestLocationAccess();
       
       if (result.success) {
@@ -548,55 +583,53 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
         </div>
       )}
 
-      {/* Location Status */}
-      {locationStatus.hasPermission && (
-        <div className="border-t pt-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">Location Status</span>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={checkUserLocation}
-                disabled={locationStatus.checking}
-                className="text-xs text-indigo-600 hover:text-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
-              >
-                {locationStatus.checking ? (
-                  <>
-                    <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span>Checking...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <span>Check Location</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-          
-          <div className="flex items-start space-x-2">
-            {getLocationStatusIcon()}
-            <div className="flex-1 text-xs text-gray-600">
-              {getLocationStatusMessage()}
-              {locationStatus.accuracy && (
-                <div className="mt-1 text-gray-500">
-                  GPS accuracy: {improvedLocationService.formatAccuracy(locationStatus.accuracy)}
-                </div>
+      {/* Location Status - Always show when location is required */}
+      <div className="border-t pt-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-gray-700">Location Status</span>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={locationStatus.hasPermission ? checkUserLocation : requestLocationPermission}
+              disabled={locationStatus.checking || requestingPermission}
+              className="text-xs text-indigo-600 hover:text-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+            >
+              {(locationStatus.checking || requestingPermission) ? (
+                <>
+                  <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>{requestingPermission ? 'Requesting...' : 'Checking...'}</span>
+                </>
+              ) : (
+                <>
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>{locationStatus.hasPermission ? 'Check Location' : 'Try Again'}</span>
+                </>
               )}
-              {locationStatus.lastChecked && (
-                <div className="mt-1 text-gray-500">
-                  Last checked: {locationStatus.lastChecked.toLocaleTimeString()}
-                </div>
-              )}
-            </div>
+            </button>
           </div>
         </div>
-      )}
+        
+        <div className="flex items-start space-x-2">
+          {getLocationStatusIcon()}
+          <div className="flex-1 text-xs text-gray-600">
+            {getLocationStatusMessage()}
+            {locationStatus.accuracy && (
+              <div className="mt-1 text-gray-500">
+                GPS accuracy: {improvedLocationService.formatAccuracy(locationStatus.accuracy)}
+              </div>
+            )}
+            {locationStatus.lastChecked && (
+              <div className="mt-1 text-gray-500">
+                Last checked: {locationStatus.lastChecked.toLocaleTimeString()}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Notes Section */}
       <div className="border-t pt-4">
