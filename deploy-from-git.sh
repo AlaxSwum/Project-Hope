@@ -117,7 +117,7 @@ rm -rf .next node_modules package-lock.json
 
 # Install dependencies
 echo "📦 Installing dependencies..."
-npm install --omit=dev
+npm install
 
 # Build the application
 echo "🏗️  Building Next.js application..."
