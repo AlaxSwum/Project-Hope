@@ -71,12 +71,12 @@ const BranchTimeManagement: React.FC<BranchTimeManagementProps> = ({ branch, sta
       // Calculate active staff and staff on break
       const active = (entries || []).filter((entry: any) => 
         entry.clock_in_time && !entry.clock_out_time && 
-        !entry.break_entries?.some((b: any) => b.clock_in_time && !b.clock_out_time)
+        !entry.break_entries?.some((b: any) => b.start_time && !b.end_time)
       );
       
       const onBreak = (entries || []).filter((entry: any) =>
         entry.clock_in_time && !entry.clock_out_time &&
-        entry.break_entries?.some((b: any) => b.clock_in_time && !b.clock_out_time)
+        entry.break_entries?.some((b: any) => b.start_time && !b.end_time)
       );
       
       console.log('Active staff:', active.length, 'On break:', onBreak.length);
@@ -196,8 +196,8 @@ const BranchTimeManagement: React.FC<BranchTimeManagementProps> = ({ branch, sta
                 </tr>
               ) : (
                 timeEntries.map((entry) => {
-                                          const isOnBreak = entry.break_entries?.some(b => b.clock_in_time && !b.clock_out_time);
-                                      const currentBreak = entry.break_entries?.find(b => !b.clock_out_time);
+                                          const isOnBreak = entry.break_entries?.some((b: any) => b.start_time && !b.end_time);
+                                      const currentBreak = entry.break_entries?.find((b: any) => !b.end_time);
                   
                   // Calculate duration
                   const clockIn = new Date(entry.clock_in_time);
