@@ -64,7 +64,7 @@ export const branchService = {
 
       // Get staff counts for each branch
       const branchesWithStaffCount = await Promise.all(
-        (branches || []).map(async (branch) => {
+        (branches || []).map(async (branch: any) => {
           const { count } = await supabaseAdmin
             .from('user_branch_assignments')
             .select('*', { count: 'exact', head: true })
