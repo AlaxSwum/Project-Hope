@@ -113,11 +113,11 @@ systemctl stop hope-ims || true
 
 # Clear existing build and dependencies
 echo "🧹 Cleaning previous build..."
-rm -rf .next node_modules
+rm -rf .next node_modules package-lock.json
 
 # Install dependencies
 echo "📦 Installing dependencies..."
-npm ci --only=production
+npm install --omit=dev
 
 # Build the application
 echo "🏗️  Building Next.js application..."
