@@ -101,6 +101,8 @@ export interface BranchLocation {
   latitude: number
   longitude: number
   radius: number
+  address?: string
+  radius_meters?: number
   created_at: string
   updated_at: string
 }
