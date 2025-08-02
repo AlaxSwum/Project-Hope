@@ -128,7 +128,7 @@ const GoogleMapsPicker: React.FC<GoogleMapsPickerProps> = ({
 
       // Add initial circle if showRadius is true
       if (showRadius) {
-        const initialCircle = new window.google.maps.Circle({
+        const circle = new window.google.maps.Circle({
           map: mapInstance,
           center: { lat: initialLat, lng: initialLng },
           radius: currentRadius,
@@ -140,11 +140,11 @@ const GoogleMapsPicker: React.FC<GoogleMapsPickerProps> = ({
           editable: true
         });
 
-        setCircle(initialCircle);
+        setCircle(circle);
 
         // Handle radius changes
-        window.google.maps.event.addListener(initialCircle, 'radius_changed', () => {
-          const newRadius = Math.round(initialCircle.getRadius());
+        window.google.maps.event.addListener(circle, 'radius_changed', () => {
+          const newRadius = Math.round(circle.getRadius());
           setCurrentRadius(newRadius);
           onRadiusChange?.(newRadius);
         });
@@ -159,8 +159,8 @@ const GoogleMapsPicker: React.FC<GoogleMapsPickerProps> = ({
         initialMarker.setPosition(event.latLng);
         
         // Update circle position if exists
-        if (initialCircle) {
-          initialCircle.setCenter(event.latLng);
+        if (circle) {
+          circle.setCenter(event.latLng);
         }
 
         // Get address from coordinates
@@ -182,8 +182,8 @@ const GoogleMapsPicker: React.FC<GoogleMapsPickerProps> = ({
         const lng = event.latLng.lng();
         
         // Update circle position if exists
-        if (initialCircle) {
-          initialCircle.setCenter(event.latLng);
+        if (circle) {
+          circle.setCenter(event.latLng);
         }
 
         // Get address from coordinates
