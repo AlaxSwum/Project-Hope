@@ -19,10 +19,10 @@ const nextConfig = {
   // Output configuration for Docker  
   // output: 'standalone', // Disabled - causes prerender issues with dynamic pages
   
-  // Performance optimizations
+  // Performance optimizations  
   experimental: {
-    optimizeCss: true,
-    optimizeImages: true,
+    // optimizeCss: true, // Disabled - causes critters module error
+    // optimizeImages: true, // Disabled - causes build issues
   },
   
   // Bundle analyzer
