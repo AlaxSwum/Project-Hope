@@ -325,6 +325,12 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
       }
 
       // Clock in
+      console.log('🕐 Attempting to clock in with data:', {
+        user_id: userId,
+        branch_id: userBranchId,
+        coordinates: userCoords
+      });
+      
       const { data, error } = await timeTrackingService.clockIn({
         user_id: userId,
         branch_id: userBranchId,
@@ -333,14 +339,24 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
         notes: notes.trim() || undefined
       });
 
+      console.log('📊 Clock-in response:', { data, error });
+
       if (error) {
+        console.error('❌ Clock-in failed:', error);
         alert('Failed to clock in: ' + error.message);
       } else {
+        console.log('✅ Clock-in successful, updating state...');
         setCurrentEntry(data);
         setNotes('');
         setShowNotes(false);
         const locationMsg = locationStatus.withinRadius ? '' : ' (location exception - please speak with your supervisor)';
         alert(`✅ Successfully clocked in${locationMsg}!`);
+        
+        // Force refresh to ensure UI updates
+        setTimeout(() => {
+          console.log('🔄 Force refreshing current entry...');
+          loadCurrentEntry();
+        }, 500);
       }
     } catch (error: any) {
       alert('Error clocking in: ' + error.message);
@@ -388,6 +404,11 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
         setNotes('');
         setShowNotes(false);
         alert(`✅ Successfully clocked out!\n\nTotal working time: ${data?.total_hours?.toFixed(1)}h`);
+        
+        // Force refresh to ensure UI updates
+        setTimeout(() => {
+          loadCurrentEntry();
+        }, 500);
       }
     } catch (error: any) {
       alert('Error clocking out: ' + error.message);
