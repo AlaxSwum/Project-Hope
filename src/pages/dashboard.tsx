@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { authService, userService, supabase } from '../lib/supabase-secure';
-import { checklistService, timeTrackingService } from '../lib/supabase';
+import { checklistService, timeTrackingService } from '../lib/supabase-secure';
 import ImprovedClockInOut from '../components/ImprovedClockInOut';
 
 const Dashboard: NextPage = () => {

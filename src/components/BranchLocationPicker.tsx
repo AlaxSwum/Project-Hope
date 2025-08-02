@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { timeTrackingService, BranchLocation } from '../lib/supabase';
+import { timeTrackingService, BranchLocation } from '../lib/supabase-secure';
 import { locationService, LocationUtils, Coordinates } from '../lib/location-service';
 import GoogleMapsPicker from './GoogleMapsPicker';
 

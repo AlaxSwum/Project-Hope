@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { authService, userService, UserData } from '../../lib/supabase-secure';
-import { checklistService, timeTrackingService, holidayService } from '../../lib/supabase';
+import { checklistService, timeTrackingService, holidayService } from '../../lib/supabase-secure';
 import { branchService } from '../../lib/branch-service';
 import BranchLocationPicker from '../../components/BranchLocationPicker';
 import BranchCard from '../../components/BranchCard';

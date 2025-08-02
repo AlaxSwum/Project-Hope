@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { timeTrackingService } from '../lib/supabase';
+import { timeTrackingService } from '../lib/supabase-secure';
 
 interface TimeEntry {
   id: string;

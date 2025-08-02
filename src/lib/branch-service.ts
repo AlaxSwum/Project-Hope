@@ -1,6 +1,6 @@
 // Branch Service for Hope Pharmacy IMS
 // Real implementation with Supabase API calls
-import { supabaseAdmin, authService } from './supabase';
+import { supabaseAdmin, authService } from './supabase-secure';
 
 export interface BranchData {
   branch_name: string;

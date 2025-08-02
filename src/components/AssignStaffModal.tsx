@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, timeTrackingService } from '../lib/supabase';
+import { supabase, timeTrackingService } from '../lib/supabase-secure';
 import { toast } from 'react-toastify';
 
 interface AssignStaffModalProps {
