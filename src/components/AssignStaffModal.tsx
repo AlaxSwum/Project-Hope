@@ -81,7 +81,7 @@ export default function AssignStaffModal({ branchId, onClose, onStaffChanged }: 
 
       // Load schedules for each assignment
       const assignmentsWithSchedules = await Promise.all(
-        (assignments || []).map(async (assignment) => {
+        (assignments || []).map(async (assignment: any) => {
           try {
             const { data: schedule } = await supabase
               .from('employee_schedules')
