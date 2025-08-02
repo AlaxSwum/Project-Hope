@@ -450,7 +450,7 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
       return improvedLocationService.getLocationStatusMessage(
         locationStatus.withinRadius,
         locationStatus.distance,
-        branchLocation.radius_meters
+        branchLocation.radius_meters || 50
       );
     }
     
