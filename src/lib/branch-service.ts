@@ -302,8 +302,8 @@ export const branchService = {
       }
 
       // Filter out already assigned users
-      const assignedUserIds = new Set(assignedUsers?.map(a => a.user_id) || []);
-      const availableUsers = allUsers?.filter(user => !assignedUserIds.has(user.id)) || [];
+      const assignedUserIds = new Set(assignedUsers?.map((a: any) => a.user_id) || []);
+      const availableUsers = allUsers?.filter((user: any) => !assignedUserIds.has(user.id)) || [];
 
       return { data: availableUsers, error: null };
     } catch (error) {
