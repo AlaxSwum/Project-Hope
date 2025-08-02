@@ -143,7 +143,7 @@ export default function AssignStaffModal({ branchId, onClose, onStaffChanged }: 
       setAssignedStaff(assignmentsWithSchedules);
     } catch (error) {
       console.error('Error loading assigned staff:', error);
-      toast.error(`Failed to load assigned staff: ${error.message}`);
+      toast.error(`Failed to load assigned staff: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setLoading(false);
     }
