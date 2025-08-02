@@ -16,8 +16,8 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   
-  // Output configuration for Docker
-  output: 'standalone',
+  // Output configuration for Docker  
+  // output: 'standalone', // Disabled - causes prerender issues with dynamic pages
   
   // Performance optimizations
   experimental: {
