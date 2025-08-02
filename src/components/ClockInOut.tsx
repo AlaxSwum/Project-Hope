@@ -376,7 +376,7 @@ const ClockInOut: React.FC<ClockInOutProps> = ({ userId, userBranchId }) => {
     return LocationUtils.getLocationStatusMessage(
       locationStatus.isWithinRadius,
       locationStatus.distance || 0,
-      branchLocation.radius_meters
+      branchLocation.radius_meters || 50
     );
   };
 
