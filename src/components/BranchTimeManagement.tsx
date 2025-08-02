@@ -69,14 +69,14 @@ const BranchTimeManagement: React.FC<BranchTimeManagementProps> = ({ branch, sta
       setTimeEntries(entries || []);
       
       // Calculate active staff and staff on break
-      const active = (entries || []).filter(entry => 
+      const active = (entries || []).filter((entry: any) => 
         entry.clock_in_time && !entry.clock_out_time && 
-        !entry.break_entries?.some(b => b.clock_in_time && !b.clock_out_time)
+        !entry.break_entries?.some((b: any) => b.clock_in_time && !b.clock_out_time)
       );
       
-      const onBreak = (entries || []).filter(entry =>
+      const onBreak = (entries || []).filter((entry: any) =>
         entry.clock_in_time && !entry.clock_out_time &&
-        entry.break_entries?.some(b => b.clock_in_time && !b.clock_out_time)
+        entry.break_entries?.some((b: any) => b.clock_in_time && !b.clock_out_time)
       );
       
       console.log('Active staff:', active.length, 'On break:', onBreak.length);
