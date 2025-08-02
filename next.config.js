@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
-const { withSentryConfig } = require('@sentry/nextjs');
+let withSentryConfig;
+try {
+  withSentryConfig = require('@sentry/nextjs').withSentryConfig;
+} catch (e) {
+  // Sentry not available, use identity function
+  withSentryConfig = (config) => config;
+}
 
 const nextConfig = {
   reactStrictMode: true,

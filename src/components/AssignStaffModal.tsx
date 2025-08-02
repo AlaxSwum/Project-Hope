@@ -143,7 +143,7 @@ export default function AssignStaffModal({ branchId, onClose, onStaffChanged }: 
       setAssignedStaff(assignmentsWithSchedules);
     } catch (error) {
       console.error('Error loading assigned staff:', error);
-      toast.error(`Failed to load assigned staff: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(`Failed to load assigned staff: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -235,7 +235,7 @@ export default function AssignStaffModal({ branchId, onClose, onStaffChanged }: 
       setShowAddStaff(false);
     } catch (error) {
       console.error('Error assigning staff:', error);
-      toast.error(`Failed to assign staff: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(`Failed to assign staff: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -385,7 +385,7 @@ export default function AssignStaffModal({ branchId, onClose, onStaffChanged }: 
       setShowScheduleModal(false);
     } catch (error) {
       console.error('Error updating schedule:', error);
-      toast.error(`Failed to update schedule: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(`Failed to update schedule: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -410,12 +410,12 @@ export default function AssignStaffModal({ branchId, onClose, onStaffChanged }: 
 
       if (error) {
         // If column doesn't exist, show a helpful message
-        if (error.message?.includes('column "pay_rate" of relation "branch_staff_assignments" does not exist')) {
+        if (error instanceof Error && error.message?.includes('column "pay_rate" of relation "branch_staff_assignments" does not exist')) {
           toast.error('Pay rate feature requires database update. Please contact administrator to add pay_rate column.');
           console.log('Run this SQL in Supabase: ALTER TABLE branch_staff_assignments ADD COLUMN pay_rate DECIMAL(10, 2) DEFAULT 12.00;');
         } else {
           console.error('Database error:', error);
-          toast.error(`Failed to update pay rate: ${error.message}`);
+          toast.error(`Failed to update pay rate: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
         return;
       }

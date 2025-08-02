@@ -64,7 +64,7 @@ export const branchService = {
 
       // Get staff counts for each branch
       const branchesWithStaffCount = await Promise.all(
-        (branches || []).map(async (branch: any) => {
+        (branches || []).map(async (branch) => {
           const { count } = await supabaseAdmin
             .from('user_branch_assignments')
             .select('*', { count: 'exact', head: true })
@@ -302,8 +302,8 @@ export const branchService = {
       }
 
       // Filter out already assigned users
-      const assignedUserIds = new Set(assignedUsers?.map((a: any) => a.user_id) || []);
-      const availableUsers = allUsers?.filter((user: any) => !assignedUserIds.has(user.id)) || [];
+      const assignedUserIds = new Set(assignedUsers?.map(a => a.user_id) || []);
+      const availableUsers = allUsers?.filter(user => !assignedUserIds.has(user.id)) || [];
 
       return { data: availableUsers, error: null };
     } catch (error) {

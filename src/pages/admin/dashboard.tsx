@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { authService, userService, UserData } from '../../lib/supabase-secure';
-import { checklistService, timeTrackingService, holidayService } from '../../lib/supabase-secure';
+import { checklistService, timeTrackingService } from '../../lib/supabase-secure';
 import { branchService } from '../../lib/branch-service';
 import BranchLocationPicker from '../../components/BranchLocationPicker';
 import BranchCard from '../../components/BranchCard';
@@ -19,6 +19,7 @@ const AdminDashboard: NextPage = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateUser, setShowCreateUser] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Initialize activeSection from localStorage to persist across refreshes
   const [activeSection, setActiveSection] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -218,13 +219,15 @@ const AdminDashboard: NextPage = () => {
     try {
       const { error } = await userService.deleteUser(userId);
       if (error) {
-        alert('Error deleting user: ' + error.message);
+        const errorMessage = error?.message || error || 'Unknown error occurred';
+        alert('Error deleting user: ' + errorMessage);
       } else {
         alert('User deleted successfully');
         loadUsers(); // Refresh the list
       }
-    } catch (error) {
-      alert('Error deleting user');
+    } catch (error: any) {
+      const errorMessage = error?.message || error || 'Unknown error occurred';
+      alert('Error deleting user: ' + errorMessage);
     }
   };
 
@@ -681,7 +684,127 @@ const AdminDashboard: NextPage = () => {
       </Head>
 
       <div className="min-h-screen bg-gray-50 flex">
-        {/* Sidebar */}
+        {/* Mobile menu overlay */}
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setMobileMenuOpen(false)}></div>
+            <div className="fixed top-0 left-0 w-64 h-full bg-white shadow-lg z-50">
+              <div className="flex flex-col h-full">
+                {/* Mobile Logo and Close Button */}
+                <div className="flex items-center justify-between px-6 py-6 border-b border-gray-100">
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
+                      <span className="text-white font-bold text-lg">H</span>
+                    </div>
+                    <div className="ml-3">
+                      <h1 className="text-lg font-bold text-gray-900">Management Panel</h1>
+                      <p className="text-xs text-gray-500">Hope Pharmacy IMS</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Mobile User Info */}
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center">
+                      <span className="text-white font-semibold text-sm">
+                        {userProfile?.first_name?.charAt(0) || 'A'}{userProfile?.last_name?.charAt(0) || 'D'}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">
+                        {userProfile ? `${userProfile.first_name} ${userProfile.last_name}` : 'Administrator'}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">Administrator • Management Panel</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mobile Navigation */}
+                <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
+                  {[
+                    { id: 'users', name: 'User Management', icon: (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-2.239" />
+                      </svg>
+                    )},
+                    { id: 'checklists', name: 'Checklist Management', icon: (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                      </svg>
+                    )},
+                    { id: 'branches', name: 'Branch Management', icon: (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                    )},
+                    { id: 'payslips', name: 'Payroll Management', icon: (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    )},
+                    { id: 'holidays', name: 'Holiday Management', icon: (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setActiveSection(item.id);
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`${
+                        activeSection === item.id
+                          ? 'bg-purple-50 border-purple-300 text-purple-700'
+                          : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      } group flex items-center px-3 py-2 text-sm font-medium border-l-4 rounded-r-lg transition-all duration-200 w-full`}
+                    >
+                      <span className={`${activeSection === item.id ? 'text-purple-500' : 'text-gray-400 group-hover:text-gray-500'} mr-3`}>
+                        {item.icon}
+                      </span>
+                      <span className="flex-1 text-left">{item.name}</span>
+                    </button>
+                  ))}
+                </nav>
+
+                {/* Mobile Sign Out */}
+                <div className="px-6 py-4 border-t border-gray-100">
+                  <a
+                    href="/dashboard"
+                    className="group flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 w-full mb-2"
+                  >
+                    <svg className="text-gray-400 group-hover:text-blue-500 mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6a2 2 0 01-2 2H10a2 2 0 01-2-2V5z" />
+                    </svg>
+                    User Dashboard
+                  </a>
+                  <button
+                    onClick={handleSignOut}
+                    className="group flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 w-full"
+                  >
+                    <svg className="text-gray-400 group-hover:text-red-500 mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Desktop Sidebar */}
         <div className="hidden md:flex md:w-64 md:flex-col">
           <div className="flex flex-col flex-grow bg-white border-r border-gray-200 shadow-sm">
             {/* Logo and Title */}
@@ -745,8 +868,37 @@ const AdminDashboard: NextPage = () => {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Top Header */}
-          <header className="bg-white border-b border-gray-200 shadow-sm">
+          {/* Mobile Header */}
+          <div className="md:hidden bg-white shadow-sm border-b border-gray-200 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <button
+                  onClick={() => setMobileMenuOpen(true)}
+                  className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+                <div className="ml-3 flex items-center">
+                  <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">H</span>
+                  </div>
+                  <h1 className="ml-2 text-lg font-bold text-gray-900">Management Panel</h1>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center">
+                  <span className="text-white font-semibold text-xs">
+                    {userProfile?.first_name?.charAt(0) || 'A'}{userProfile?.last_name?.charAt(0) || 'D'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop Top Header */}
+          <header className="hidden md:block bg-white border-b border-gray-200 shadow-sm">
             <div className="px-6 py-4">
               <div className="flex justify-between items-center">
                 <div className="flex items-center space-x-4">
@@ -805,7 +957,7 @@ const AdminDashboard: NextPage = () => {
 
           {/* Main Content Area */}
           <main className="flex-1 overflow-y-auto bg-gray-50">
-            <div className="px-6 py-8">
+            <div className="px-4 md:px-6 py-4 md:py-8">
               
               {/* Overview Section */}
               {activeSection === 'overview' && (
@@ -1602,7 +1754,7 @@ const AdminDashboard: NextPage = () => {
 
                       
                       {/* Embedded Stats Cards */}
-                      <div className="grid grid-cols-4 gap-6 mt-8">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mt-8">
                         <div className="bg-white/20 backdrop-blur rounded-xl p-6 border border-white/30">
                           <div className="flex items-center space-x-4">
                             <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center shadow-lg">
@@ -1797,7 +1949,7 @@ const AdminDashboard: NextPage = () => {
                                       </div>
                                     </div>
                                     
-                                    <div className="grid grid-cols-3 gap-4 text-center">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                                       <div>
                                         <div className="text-2xl font-bold text-indigo-600">{Math.round(avgCompletion)}%</div>
                                         <div className="text-xs text-gray-500">Avg Completion</div>
@@ -2591,7 +2743,7 @@ const AdminDashboard: NextPage = () => {
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <p className="text-sm font-medium text-gray-500">Total Hours</p>
                     <p className="text-2xl font-bold text-gray-900">{selectedEmployee.totalHours}h</p>

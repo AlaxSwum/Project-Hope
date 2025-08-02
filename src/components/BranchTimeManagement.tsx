@@ -69,14 +69,14 @@ const BranchTimeManagement: React.FC<BranchTimeManagementProps> = ({ branch, sta
       setTimeEntries(entries || []);
       
       // Calculate active staff and staff on break
-      const active = (entries || []).filter((entry: any) => 
+      const active = (entries || []).filter(entry => 
         entry.clock_in_time && !entry.clock_out_time && 
-        !entry.break_entries?.some((b: any) => b.start_time && !b.end_time)
+        !entry.break_entries?.some(b => b.clock_in_time && !b.clock_out_time)
       );
       
-      const onBreak = (entries || []).filter((entry: any) =>
+      const onBreak = (entries || []).filter(entry =>
         entry.clock_in_time && !entry.clock_out_time &&
-        entry.break_entries?.some((b: any) => b.start_time && !b.end_time)
+        entry.break_entries?.some(b => b.clock_in_time && !b.clock_out_time)
       );
       
       console.log('Active staff:', active.length, 'On break:', onBreak.length);
@@ -196,8 +196,8 @@ const BranchTimeManagement: React.FC<BranchTimeManagementProps> = ({ branch, sta
                 </tr>
               ) : (
                 timeEntries.map((entry) => {
-                                          const isOnBreak = entry.break_entries?.some((b: any) => b.start_time && !b.end_time);
-                                      const currentBreak = entry.break_entries?.find((b: any) => !b.end_time);
+                                          const isOnBreak = entry.break_entries?.some(b => b.clock_in_time && !b.clock_out_time);
+                                      const currentBreak = entry.break_entries?.find(b => !b.clock_out_time);
                   
                   // Calculate duration
                   const clockIn = new Date(entry.clock_in_time);
@@ -274,8 +274,8 @@ const BranchTimeManagement: React.FC<BranchTimeManagementProps> = ({ branch, sta
                                 <span className="w-2 h-2 bg-orange-400 rounded-full mt-1.5"></span>
                                 <div className="flex-1">
                                   <div className="text-sm text-gray-900">
-                                    {new Date(breakEntry.start_time).toLocaleTimeString()} - 
-                                    {breakEntry.end_time ? new Date(breakEntry.end_time).toLocaleTimeString() : 'Ongoing'}
+                                    {new Date(breakEntry.clock_in_time).toLocaleTimeString()} - 
+                                    {breakEntry.clock_out_time ? new Date(breakEntry.clock_out_time).toLocaleTimeString() : 'Ongoing'}
                                   </div>
                                   {breakEntry.notes && (
                                     <p className="text-xs text-gray-500 mt-0.5">{breakEntry.notes}</p>

@@ -110,15 +110,30 @@ async function deleteUser(req: NextApiRequest, res: NextApiResponse) {
   try {
     const { userId } = req.body
     
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
-    
-    if (error) {
-      return res.status(400).json({ error: error.message })
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' })
     }
     
-    res.status(200).json({ success: true })
-  } catch (error) {
+    // Delete from auth
+    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId)
+    
+    if (authError) {
+      return res.status(400).json({ error: authError.message })
+    }
+    
+    // Also delete from users table if exists
+    const { error: tableError } = await supabaseAdmin
+      .from('users')
+      .delete()
+      .eq('id', userId)
+    
+    if (tableError) {
+      console.warn('Warning: Could not delete from users table:', tableError.message)
+    }
+    
+    res.status(200).json({ data: { success: true, userId }, error: null })
+  } catch (error: any) {
     console.error('Delete user error:', error)
-    res.status(500).json({ error: 'Internal server error' })
+    res.status(500).json({ error: error?.message || 'Internal server error' })
   }
 }

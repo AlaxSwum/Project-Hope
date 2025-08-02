@@ -52,6 +52,36 @@ export interface UserProfile {
   updated_at: string
 }
 
+export interface TimeEntry {
+  id: string
+  user_id: string
+  branch_id: string
+  clock_in_time: string
+  clock_out_time?: string
+  break_duration?: number
+  total_hours?: number
+  notes?: string
+  created_at?: string
+  updated_at?: string
+  clock_in_latitude?: number;
+  clock_in_longitude?: number;
+  clock_out_latitude?: number;
+  clock_out_longitude?: number;
+  pay_rate?: number;
+  branch?: BranchLocation;
+}
+
+export interface BranchLocation {
+  id: string
+  branch_id: string
+  latitude: number
+  longitude: number
+  address: string
+  radius_meters: number
+  created_at?: string
+  updated_at?: string
+}
+
 export interface Checklist {
   id: string
   name: string
@@ -71,48 +101,6 @@ export interface ChecklistItem {
   updated_at: string
   checklist?: Checklist
   user?: any
-}
-
-export interface TimeEntry {
-  id: string
-  user_id: string
-  branch_id: string
-  clock_in_time: string
-  clock_out_time?: string
-  clock_in_location?: {
-    latitude: number
-    longitude: number
-    accuracy?: number
-  }
-  clock_out_location?: {
-    latitude: number
-    longitude: number
-    accuracy?: number
-  }
-  notes?: string
-  created_at: string
-  updated_at: string
-  branch?: {
-    branch_name: string
-    id: string
-  }
-  clock_in_latitude?: number
-  clock_in_longitude?: number
-  clock_out_latitude?: number
-  clock_out_longitude?: number
-}
-
-export interface BranchLocation {
-  id: string
-  branch_id: string
-  name: string
-  latitude: number
-  longitude: number
-  radius: number
-  address?: string
-  radius_meters?: number
-  created_at: string
-  updated_at: string
 }
 
 // Authentication functions
