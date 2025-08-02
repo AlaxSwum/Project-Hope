@@ -235,7 +235,7 @@ export default function AssignStaffModal({ branchId, onClose, onStaffChanged }: 
       setShowAddStaff(false);
     } catch (error) {
       console.error('Error assigning staff:', error);
-      toast.error(`Failed to assign staff: ${error.message}`);
+      toast.error(`Failed to assign staff: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
