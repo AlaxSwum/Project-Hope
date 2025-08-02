@@ -73,6 +73,38 @@ export interface ChecklistItem {
   user?: any
 }
 
+export interface TimeEntry {
+  id: string
+  user_id: string
+  branch_id: string
+  clock_in_time: string
+  clock_out_time?: string
+  clock_in_location?: {
+    latitude: number
+    longitude: number
+    accuracy?: number
+  }
+  clock_out_location?: {
+    latitude: number
+    longitude: number
+    accuracy?: number
+  }
+  notes?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface BranchLocation {
+  id: string
+  branch_id: string
+  name: string
+  latitude: number
+  longitude: number
+  radius: number
+  created_at: string
+  updated_at: string
+}
+
 // Authentication functions
 export const authService = {
   // Admin creates new user (via API endpoint)
@@ -370,6 +402,345 @@ export const realtimeService = {
     return supabase.removeChannel(subscription);
   }
 }
+
+// Time Tracking Service
+export const timeTrackingService = {
+  async getTimeEntries(userId: string, startDate: string, endDate: string) {
+    const { data, error } = await supabase
+      .from('time_entries')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('clock_in_time', startDate)
+      .lte('clock_in_time', endDate);
+    return { data, error };
+  },
+
+  async getActiveStaff(branchId: string) {
+    const { data, error } = await supabase
+      .from('time_entries')
+      .select('*, user_profiles(*)')
+      .eq('branch_id', branchId)
+      .is('clock_out_time', null);
+    return { data, error };
+  },
+
+  async getStaffOnBreak(branchId: string) {
+    const { data, error } = await supabase
+      .from('breaks')
+      .select('*, time_entries(*, user_profiles(*))')
+      .eq('time_entries.branch_id', branchId)
+      .is('end_time', null);
+    return { data, error };
+  },
+
+  async calculateScheduledHours(userId: string, startDate: string, endDate: string) {
+    // Basic implementation
+    return { totalHours: 0, entries: [] };
+  },
+
+  async getAllTimeEntries(startDate: string, endDate: string) {
+    const { data, error } = await supabase
+      .from('time_entries')
+      .select('*')
+      .gte('clock_in_time', startDate)
+      .lte('clock_in_time', endDate);
+    return { data, error };
+  },
+
+  async getEmployeeSchedule(userId: string) {
+    const { data, error } = await supabase
+      .from('employee_schedules')
+      .select('*')
+      .eq('user_id', userId);
+    return { data, error };
+  },
+
+  async getBranchLocation(branchId: string) {
+    const { data, error } = await supabase
+      .from('branch_locations')
+      .select('*')
+      .eq('branch_id', branchId)
+      .single();
+    return { data, error };
+  },
+
+  async updateEmployeeSchedule(scheduleId: string, formData: any) {
+    const { data, error } = await supabase
+      .from('employee_schedules')
+      .update(formData)
+      .eq('id', scheduleId);
+    return { data, error };
+  },
+
+  async createEmployeeSchedule(scheduleData: any) {
+    const { data, error } = await supabase
+      .from('employee_schedules')
+      .insert(scheduleData);
+    return { data, error };
+  },
+
+  async getBranchTimeEntries(branchId: string, date: string) {
+    let query = supabase
+      .from('time_entries')
+      .select('*, user_profiles(*)')
+      .eq('branch_id', branchId);
+    
+    if (date) {
+      query = query.gte('clock_in_time', date).lt('clock_in_time', date + 'T23:59:59');
+    }
+    
+    const { data, error } = await query;
+    return { data, error };
+  },
+
+  async endBreak(breakId: string) {
+    const { data, error } = await supabase
+      .from('breaks')
+      .update({ end_time: new Date().toISOString() })
+      .eq('id', breakId);
+    return { data, error };
+  },
+
+  async startBreak(breakData: any) {
+    const { data, error } = await supabase
+      .from('breaks')
+      .insert(breakData);
+    return { data, error };
+  },
+
+  async getCurrentTimeEntry(userId: string) {
+    const { data, error } = await supabase
+      .from('time_entries')
+      .select('*')
+      .eq('user_id', userId)
+      .is('clock_out_time', null)
+      .single();
+    return { data, error };
+  },
+
+  async getActiveBreak(timeEntryId: string) {
+    const { data, error } = await supabase
+      .from('breaks')
+      .select('*')
+      .eq('time_entry_id', timeEntryId)
+      .is('end_time', null)
+      .single();
+    return { data, error };
+  },
+
+  async clockIn(clockInData: any) {
+    const { data, error } = await supabase
+      .from('time_entries')
+      .insert(clockInData);
+    return { data, error };
+  },
+
+  async clockOut(timeEntryId: string, clockOutData: any) {
+    const { data, error } = await supabase
+      .from('time_entries')
+      .update({ clock_out_time: new Date().toISOString(), ...clockOutData })
+      .eq('id', timeEntryId);
+    return { data, error };
+  },
+
+  async updateBranchLocation(locationId: string, locationData: any) {
+    const { data, error } = await supabase
+      .from('branch_locations')
+      .update(locationData)
+      .eq('id', locationId);
+    return { data, error };
+  },
+
+  async createBranchLocation(locationData: any) {
+    const { data, error } = await supabase
+      .from('branch_locations')
+      .insert(locationData);
+    return { data, error };
+  }
+};
+
+// Checklist Service
+export const checklistService = {
+  async getChecklistsForUser(userId: string) {
+    const { data, error } = await supabase
+      .from('checklists')
+      .select('*')
+      .eq('assigned_to', userId);
+    return { data, error };
+  },
+
+  async getUserProgress(userId: string) {
+    const { data, error } = await supabase
+      .from('user_progress')
+      .select('*')
+      .eq('user_id', userId);
+    return { data, error };
+  },
+
+  async getDailyStatus(userId: string) {
+    const today = new Date().toISOString().split('T')[0];
+    const { data, error } = await supabase
+      .from('user_progress')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('completed_at', today)
+      .lt('completed_at', today + 'T23:59:59');
+    return { data, error };
+  },
+
+  async getChecklistItems(checklistId: string) {
+    const { data, error } = await supabase
+      .from('checklist_items')
+      .select('*')
+      .eq('checklist_id', checklistId)
+      .order('order_index');
+    return { data, error };
+  },
+
+  async updateItemProgress(progressData: any) {
+    const { error } = await supabase
+      .from('user_progress')
+      .upsert(progressData);
+    return { error };
+  },
+
+  async getFolders(branchId: string) {
+    const { data, error } = await supabase
+      .from('folders')
+      .select('*')
+      .eq('branch_id', branchId);
+    return { data, error };
+  },
+
+  async getChecklists(folderId: string) {
+    const { data, error } = await supabase
+      .from('checklists')
+      .select('*')
+      .eq('folder_id', folderId);
+    return { data, error };
+  },
+
+  async deleteFolder(folderId: string) {
+    const { error } = await supabase
+      .from('folders')
+      .delete()
+      .eq('id', folderId);
+    return { error };
+  },
+
+  async deleteChecklist(checklistId: string) {
+    const { error } = await supabase
+      .from('checklists')
+      .delete()
+      .eq('id', checklistId);
+    return { error };
+  },
+
+  async getAllUsersProgress(date: string) {
+    const { data, error } = await supabase
+      .from('user_progress')
+      .select('*, user_profiles(*), checklist_items(*)')
+      .gte('completed_at', date)
+      .lt('completed_at', date + 'T23:59:59');
+    return { data, error };
+  },
+
+  async createFolder(folderData: any) {
+    const { error } = await supabase
+      .from('folders')
+      .insert(folderData);
+    return { error };
+  },
+
+  async createChecklist(checklistData: any) {
+    const { error } = await supabase
+      .from('checklists')
+      .insert(checklistData);
+    return { error };
+  },
+
+  async createChecklistItem(itemData: any) {
+    const { error } = await supabase
+      .from('checklist_items')
+      .insert(itemData);
+    return { error };
+  },
+
+  async deleteChecklistItem(itemId: string) {
+    const { error } = await supabase
+      .from('checklist_items')
+      .delete()
+      .eq('id', itemId);
+    return { error };
+  },
+
+  async reorderChecklistItems(checklistId: string, items: any[]) {
+    // Update order_index for each item
+    const updates = items.map((item, index) => 
+      supabase
+        .from('checklist_items')
+        .update({ order_index: index })
+        .eq('id', item.id)
+    );
+    
+    await Promise.all(updates);
+    return { error: null };
+  },
+
+  async updateFolder(folderId: string, folderData: any) {
+    const { error } = await supabase
+      .from('folders')
+      .update(folderData)
+      .eq('id', folderId);
+    return { error };
+  },
+
+  async updateChecklist(checklistId: string, checklistData: any) {
+    const { error } = await supabase
+      .from('checklists')
+      .update(checklistData)
+      .eq('id', checklistId);
+    return { error };
+  }
+};
+
+// Holiday Service
+export const holidayService = {
+  async getHolidays(branchId?: string) {
+    let query = supabase.from('holidays').select('*');
+    if (branchId) {
+      query = query.eq('branch_id', branchId);
+    }
+    const { data, error } = await query;
+    return { data, error };
+  },
+
+  async createHoliday(holidayData: any) {
+    const { data, error } = await supabase
+      .from('holidays')
+      .insert(holidayData);
+    return { data, error };
+  },
+
+  async updateHoliday(holidayId: string, holidayData: any) {
+    const { error } = await supabase
+      .from('holidays')
+      .update(holidayData)
+      .eq('id', holidayId);
+    return { error };
+  },
+
+  async deleteHoliday(holidayId: string) {
+    const { error } = await supabase
+      .from('holidays')
+      .delete()
+      .eq('id', holidayId);
+    return { error };
+  }
+};
+
+// Admin client (same as regular client for now - would use service role in production)
+export const supabaseAdmin = supabase;
 
 // Export the main client
 export default supabase
