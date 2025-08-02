@@ -224,7 +224,7 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
       const result = await improvedLocationService.checkWorkLocation(
         branchLocation.latitude,
         branchLocation.longitude,
-        branchLocation.radius_meters
+        branchLocation.radius_meters || 50
       );
 
       if (result) {
