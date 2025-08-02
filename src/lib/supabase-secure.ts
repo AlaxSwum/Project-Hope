@@ -92,6 +92,14 @@ export interface TimeEntry {
   notes?: string
   created_at: string
   updated_at: string
+  branch?: {
+    branch_name: string
+    id: string
+  }
+  clock_in_latitude?: number
+  clock_in_longitude?: number
+  clock_out_latitude?: number
+  clock_out_longitude?: number
 }
 
 export interface BranchLocation {
