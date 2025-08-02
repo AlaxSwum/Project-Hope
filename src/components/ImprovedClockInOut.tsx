@@ -548,9 +548,17 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
               </p>
               
               <div className="mt-3 p-3 bg-amber-100 rounded-lg">
-                <p className="text-xs text-amber-800 font-medium">
+                <p className="text-xs text-amber-800 font-medium mb-2">
                   {improvedLocationService.getBrowserInstructions()}
                 </p>
+                
+                <div className="mt-2 p-2 bg-amber-200 rounded text-xs text-amber-900">
+                  <strong>No popup dialog?</strong> Manually enable location:
+                  <br />• Chrome: Click the lock icon in address bar → Location → Allow
+                  <br />• Safari: Safari → Settings → Websites → Location → Allow  
+                  <br />• Firefox: Click shield icon → Location → Allow
+                  <br />Then click "Try Again" below.
+                </div>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2 mt-4">

@@ -139,23 +139,34 @@ export class ImprovedLocationService {
         // Error callback
         (error) => {
           console.log('❌ Location access failed:', error);
+          console.log('Error details:', {
+            code: error.code,
+            message: error.message,
+            PERMISSION_DENIED: error.code === 1,
+            POSITION_UNAVAILABLE: error.code === 2,
+            TIMEOUT: error.code === 3
+          });
           
           let errorMessage = 'Failed to get your location';
           let needsPermission = false;
 
           switch (error.code) {
             case 1: // PERMISSION_DENIED
-              errorMessage = 'Location access was denied. Please enable location permissions in your browser settings.';
+              errorMessage = 'Location access was denied. If no popup appeared, manually enable location in browser settings and click "Try Again".';
               needsPermission = true;
+              console.log('🚫 PERMISSION_DENIED - Location access blocked. Check browser settings.');
               break;
             case 2: // POSITION_UNAVAILABLE
               errorMessage = 'Your location is currently unavailable. Please ensure location services are enabled on your device.';
+              console.log('📍 POSITION_UNAVAILABLE - GPS/location services issue.');
               break;
             case 3: // TIMEOUT
               errorMessage = 'Location request timed out. Please try again or move to an area with better GPS signal.';
+              console.log('⏱️ TIMEOUT - Location request took too long.');
               break;
             default:
               errorMessage = `Location error: ${error.message}`;
+              console.log('❓ UNKNOWN_ERROR:', error);
           }
 
           resolve({
