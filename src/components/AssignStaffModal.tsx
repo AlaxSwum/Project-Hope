@@ -385,7 +385,7 @@ export default function AssignStaffModal({ branchId, onClose, onStaffChanged }: 
       setShowScheduleModal(false);
     } catch (error) {
       console.error('Error updating schedule:', error);
-      toast.error(`Failed to update schedule: ${error.message}`);
+      toast.error(`Failed to update schedule: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
