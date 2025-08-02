@@ -274,8 +274,8 @@ const BranchTimeManagement: React.FC<BranchTimeManagementProps> = ({ branch, sta
                                 <span className="w-2 h-2 bg-orange-400 rounded-full mt-1.5"></span>
                                 <div className="flex-1">
                                   <div className="text-sm text-gray-900">
-                                    {new Date(breakEntry.clock_in_time).toLocaleTimeString()} - 
-                                    {breakEntry.clock_out_time ? new Date(breakEntry.clock_out_time).toLocaleTimeString() : 'Ongoing'}
+                                    {new Date(breakEntry.start_time).toLocaleTimeString()} - 
+                                    {breakEntry.end_time ? new Date(breakEntry.end_time).toLocaleTimeString() : 'Ongoing'}
                                   </div>
                                   {breakEntry.notes && (
                                     <p className="text-xs text-gray-500 mt-0.5">{breakEntry.notes}</p>
