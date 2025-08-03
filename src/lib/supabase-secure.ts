@@ -423,12 +423,9 @@ export const timeTrackingService = {
   },
 
   async getStaffOnBreak(branchId: string) {
-    const { data, error } = await supabase
-      .from('breaks')
-      .select('*, time_entries(*, user_profiles(*))')
-      .eq('time_entries.branch_id', branchId)
-      .is('end_time', null);
-    return { data, error };
+    // Breaks table doesn't exist - return empty data to prevent 404 errors
+    console.log('⚠️ Breaks functionality not available (table does not exist)');
+    return { data: [], error: null };
   },
 
   async calculateScheduledHours(userId: string, startDate: string, endDate: string) {
@@ -492,28 +489,15 @@ export const timeTrackingService = {
   },
 
   async endBreak(breakId: string) {
-    try {
-      const { data, error } = await supabase
-        .from('breaks')
-        .update({ end_time: new Date().toISOString() })
-        .eq('id', breakId);
-      return { data, error };
-    } catch (error) {
-      console.log('⚠️ Breaks table not available, break functionality disabled');
-      return { data: null, error: { message: 'Break functionality is not available' } };
-    }
+    // Breaks table doesn't exist - return success to prevent 404 errors
+    console.log('⚠️ Breaks functionality not available (table does not exist)');
+    return { data: null, error: { message: 'Break functionality is not available' } };
   },
 
   async startBreak(breakData: any) {
-    try {
-      const { data, error } = await supabase
-        .from('breaks')
-        .insert(breakData);
-      return { data, error };
-    } catch (error) {
-      console.log('⚠️ Breaks table not available, break functionality disabled');
-      return { data: null, error: { message: 'Break functionality is not available' } };
-    }
+    // Breaks table doesn't exist - return success to prevent 404 errors
+    console.log('⚠️ Breaks functionality not available (table does not exist)');
+    return { data: null, error: { message: 'Break functionality is not available' } };
   },
 
   async getCurrentTimeEntry(userId: string) {
@@ -529,19 +513,9 @@ export const timeTrackingService = {
   },
 
   async getActiveBreak(timeEntryId: string) {
-    try {
-      const { data, error } = await supabase
-        .from('breaks')
-        .select('*')
-        .eq('time_entry_id', timeEntryId)
-        .is('end_time', null)
-        .single();
-      return { data, error };
-    } catch (error) {
-      // Breaks table doesn't exist - return null (no active break)
-      console.log('⚠️ Breaks table not available, break functionality disabled');
-      return { data: null, error: null };
-    }
+    // Breaks table doesn't exist - return null to prevent 404 errors
+    console.log('⚠️ Breaks functionality not available (table does not exist)');
+    return { data: null, error: null };
   },
 
   async clockIn(clockInData: any) {
