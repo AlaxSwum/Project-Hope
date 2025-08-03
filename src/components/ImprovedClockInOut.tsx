@@ -139,12 +139,17 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
     try {
       const { data, error } = await timeTrackingService.getActiveBreak(currentEntry.id);
       if (error) {
-        console.error('Error loading current break:', error);
+        // Check if it's the expected "breaks table doesn't exist" error
+        if (error.code === '42P01' || error.message?.includes('breaks')) {
+          console.log('⚠️ Breaks functionality not available (table does not exist)');
+        } else {
+          console.error('Error loading current break:', error);
+        }
       } else {
         setCurrentBreak(data);
       }
     } catch (error) {
-      console.error('Error loading current break:', error);
+      console.log('⚠️ Breaks functionality not available');
     }
   };
 
