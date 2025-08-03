@@ -509,10 +509,12 @@ export const timeTrackingService = {
   async getCurrentTimeEntry(userId: string) {
     const { data, error } = await supabase
       .from('time_entries')
-      .select('*')
+      .select('*, branch:branches(branch_name)')
       .eq('user_id', userId)
       .is('clock_out_time', null)
-      .single();
+      .order('clock_in_time', { ascending: false })
+      .limit(1)
+      .maybeSingle();
     return { data, error };
   },
 
