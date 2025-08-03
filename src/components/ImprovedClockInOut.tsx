@@ -179,28 +179,9 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
     try {
       console.log('🔄 Refreshing location permission status...');
       
-      // First check current permission status
-      const permissionState = await improvedLocationService.checkPermissionStatus();
-      console.log('📋 Permission state:', permissionState);
-      
-      // If permission is already granted, just get location
-      if (permissionState.granted) {
-        console.log('✅ Permission already granted, getting location...');
-        setLocationStatus(prev => ({
-          ...prev,
-          hasPermission: true,
-          needsPermission: false
-        }));
-        
-        // Get location immediately
-        setTimeout(() => {
-          checkUserLocation();
-        }, 100);
-        
-        return true;
-      }
-      
-      // Otherwise request fresh permission
+      // Skip permission check - directly test location access
+      // This is more reliable than checking permission state in Chrome
+      console.log('🌍 Testing location access directly...');
       const result = await improvedLocationService.requestLocationAccess();
       
       if (result.success) {

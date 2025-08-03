@@ -110,11 +110,22 @@ export class ImprovedLocationService {
     }
 
     console.log('🌍 Requesting location access...');
+    
+    // First check if permissions API shows current state
+    if ('permissions' in navigator) {
+      try {
+        navigator.permissions.query({ name: 'geolocation' }).then(permission => {
+          console.log('📋 Current permission state:', permission.state);
+        });
+      } catch (e) {
+        console.log('📋 Could not query permission state:', e);
+      }
+    }
 
     return new Promise((resolve) => {
       const options: PositionOptions = {
         enableHighAccuracy: true,
-        timeout: 20000, // 20 seconds - generous timeout for mobile
+        timeout: 10000, // 10 seconds - shorter timeout for testing
         maximumAge: 0   // Always get fresh location for permission requests
       };
 
