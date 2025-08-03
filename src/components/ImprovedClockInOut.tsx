@@ -380,30 +380,55 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
   };
 
   const handleClockOut = async () => {
-    if (!currentEntry) return;
+    console.log('🚪 Clock-out initiated');
+    
+    if (!currentEntry) {
+      console.log('❌ No current entry found for clock-out');
+      alert('No active time entry found. Please refresh the page.');
+      return;
+    }
+
+    console.log('⏰ Current entry for clock-out:', currentEntry);
 
     const confirmClockOut = confirm(
       `Are you sure you want to clock out?\n\nWorking time: ${workingHours}`
     );
     
-    if (!confirmClockOut) return;
+    if (!confirmClockOut) {
+      console.log('🚫 Clock-out cancelled by user');
+      return;
+    }
 
+    console.log('✅ User confirmed clock-out, proceeding...');
     setLoading(true);
 
     try {
       // Try to get location for clock out
+      console.log('📍 Getting location for clock-out...');
       const userCoords = await checkUserLocation();
+      console.log('📍 Clock-out location:', userCoords);
       
       if (!userCoords) {
         // Allow clock out even if location fails
+        console.log('⚠️ Location failed, asking user to proceed anyway...');
         const proceedAnyway = confirm(
           'Could not verify your location. Do you want to clock out anyway?'
         );
         if (!proceedAnyway) {
+          console.log('🚫 User cancelled clock-out due to location');
           setLoading(false);
           return;
         }
       }
+
+      console.log('🕐 Attempting to clock out with data:', {
+        timeEntryId: currentEntry.id,
+        clockOutData: {
+          clock_out_latitude: userCoords?.latitude || 0,
+          clock_out_longitude: userCoords?.longitude || 0,
+          notes: notes.trim() || undefined
+        }
+      });
 
       const { data, error } = await timeTrackingService.clockOut(currentEntry.id, {
         clock_out_latitude: userCoords?.latitude || 0,
@@ -411,20 +436,44 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
         notes: notes.trim() || undefined
       });
 
+      console.log('📊 Clock-out response:', { data, error });
+
       if (error) {
+        console.error('❌ Clock-out failed:', error);
         alert('Failed to clock out: ' + error.message);
       } else {
+        console.log('✅ Clock-out successful, updating state...');
         setCurrentEntry(null);
         setNotes('');
         setShowNotes(false);
         alert(`✅ Successfully clocked out!\n\nTotal working time: ${data?.total_hours?.toFixed(1)}h`);
         
-        // Force refresh to ensure UI updates
-        setTimeout(() => {
-          loadCurrentEntry();
-        }, 500);
+        // Force refresh to ensure UI updates with retry logic
+        const refreshWithRetry = async (retryCount = 0) => {
+          console.log(`🔄 Force refreshing after clock-out (attempt ${retryCount + 1})...`);
+          try {
+            const { data, error } = await timeTrackingService.getCurrentTimeEntry(userId);
+            if (error) {
+              console.error(`❌ Refresh attempt ${retryCount + 1} failed:`, error);
+              if (retryCount < 2) {
+                console.log(`⏳ Retrying in ${1000 * (retryCount + 1)}ms...`);
+                setTimeout(() => refreshWithRetry(retryCount + 1), 1000 * (retryCount + 1));
+              }
+            } else {
+              console.log(`✅ Refresh attempt ${retryCount + 1} successful:`, data);
+              setCurrentEntry(data);
+            }
+          } catch (error) {
+            console.error(`❌ Exception on refresh attempt ${retryCount + 1}:`, error);
+            if (retryCount < 2) {
+              setTimeout(() => refreshWithRetry(retryCount + 1), 1000 * (retryCount + 1));
+            }
+          }
+        };
+        setTimeout(() => refreshWithRetry(), 1000);
       }
     } catch (error: any) {
+      console.error('❌ Exception during clock-out:', error);
       alert('Error clocking out: ' + error.message);
     } finally {
       setLoading(false);
@@ -432,49 +481,15 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
   };
 
   const handleStartBreak = async () => {
-    if (!currentEntry) return;
-
-    setBreakLoading(true);
-    try {
-      const { data, error } = await timeTrackingService.startBreak({
-        time_entry_id: currentEntry.id,
-        break_type: 'break',
-        notes: notes.trim() || undefined
-      });
-
-      if (error) {
-        alert('Failed to start break: ' + error.message);
-      } else {
-        setCurrentBreak(data);
-        setNotes('');
-        setShowNotes(false);
-        alert('✅ Break started!');
-      }
-    } catch (error: any) {
-      alert('Error starting break: ' + error.message);
-    } finally {
-      setBreakLoading(false);
-    }
+    // Break functionality is not available since breaks table doesn't exist
+    alert('Break functionality is currently not available.\n\nPlease speak with your supervisor if you need to take a break.');
+    return;
   };
 
   const handleEndBreak = async () => {
-    if (!currentBreak) return;
-
-    setBreakLoading(true);
-    try {
-      const { data, error } = await timeTrackingService.endBreak(currentBreak.id);
-
-      if (error) {
-        alert('Failed to end break: ' + error.message);
-      } else {
-        setCurrentBreak(null);
-        alert('✅ Break ended!');
-      }
-    } catch (error: any) {
-      alert('Error ending break: ' + error.message);
-    } finally {
-      setBreakLoading(false);
-    }
+    // Break functionality is not available since breaks table doesn't exist
+    alert('Break functionality is currently not available.');
+    return;
   };
 
   const getStatusColor = () => {
@@ -743,44 +758,23 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
           </button>
         )}
 
-        {/* Break Controls */}
+        {/* Break Controls - Currently Disabled */}
         {currentEntry && !currentEntry.clock_out_time && (
           <div className="grid grid-cols-1 gap-2">
-            {currentBreak ? (
-              <button
-                onClick={handleEndBreak}
-                disabled={breakLoading}
-                className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
-              >
-                {breakLoading ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>End Break</span>
-                  </>
-                )}
-              </button>
-            ) : (
-              <button
-                onClick={handleStartBreak}
-                disabled={breakLoading}
-                className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
-              >
-                {breakLoading ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h8m-10 5V7a3 3 0 013-3h4a3 3 0 013 3v12l-5-3-5 3z" />
-                    </svg>
-                    <span>Take a Break</span>
-                  </>
-                )}
-              </button>
-            )}
+            <button
+              onClick={handleStartBreak}
+              disabled={true}
+              className="w-full bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 cursor-not-allowed"
+              title="Break functionality is currently not available"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
+              </svg>
+              <span>Break (Not Available)</span>
+            </button>
+            <p className="text-xs text-gray-500 text-center">
+              Break functionality is temporarily unavailable
+            </p>
           </div>
         )}
         
