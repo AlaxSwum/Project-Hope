@@ -401,8 +401,8 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
       }
 
       const { data, error } = await timeTrackingService.clockOut(currentEntry.id, {
-        latitude: userCoords?.latitude || 0,
-        longitude: userCoords?.longitude || 0,
+        clock_out_latitude: userCoords?.latitude || 0,
+        clock_out_longitude: userCoords?.longitude || 0,
         notes: notes.trim() || undefined
       });
 
