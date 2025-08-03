@@ -99,14 +99,22 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
 
   const loadCurrentEntry = async () => {
     try {
+      console.log('🔄 Loading current entry for user:', userId);
       const { data, error } = await timeTrackingService.getCurrentTimeEntry(userId);
       if (error) {
-        console.error('Error loading current entry:', error);
+        console.error('❌ Error loading current entry:', error);
+        console.error('Error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
       } else {
+        console.log('✅ Current entry loaded:', data);
         setCurrentEntry(data);
       }
     } catch (error) {
-      console.error('Error loading current entry:', error);
+      console.error('❌ Exception loading current entry:', error);
     }
   };
 
@@ -333,11 +341,31 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
         const locationMsg = locationStatus.withinRadius ? '' : ' (location exception - please speak with your supervisor)';
         alert(`✅ Successfully clocked in${locationMsg}!`);
         
-        // Force refresh to ensure UI updates
-        setTimeout(() => {
-          console.log('🔄 Force refreshing current entry...');
-          loadCurrentEntry();
-        }, 500);
+        // Force refresh to ensure UI updates with retry logic
+        const refreshWithRetry = async (retryCount = 0) => {
+          console.log(`🔄 Force refreshing current entry (attempt ${retryCount + 1})...`);
+          
+          try {
+            const { data, error } = await timeTrackingService.getCurrentTimeEntry(userId);
+            if (error) {
+              console.error(`❌ Refresh attempt ${retryCount + 1} failed:`, error);
+              if (retryCount < 2) {
+                console.log(`⏳ Retrying in ${1000 * (retryCount + 1)}ms...`);
+                setTimeout(() => refreshWithRetry(retryCount + 1), 1000 * (retryCount + 1));
+              }
+            } else {
+              console.log(`✅ Refresh attempt ${retryCount + 1} successful:`, data);
+              setCurrentEntry(data);
+            }
+          } catch (error) {
+            console.error(`❌ Exception on refresh attempt ${retryCount + 1}:`, error);
+            if (retryCount < 2) {
+              setTimeout(() => refreshWithRetry(retryCount + 1), 1000 * (retryCount + 1));
+            }
+          }
+        };
+        
+        setTimeout(() => refreshWithRetry(), 1000); // Wait 1 second before first attempt
       }
     } catch (error: any) {
       alert('Error clocking in: ' + error.message);
