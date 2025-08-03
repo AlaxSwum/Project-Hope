@@ -423,9 +423,12 @@ export const timeTrackingService = {
   },
 
   async getStaffOnBreak(branchId: string) {
-    // Breaks table doesn't exist - return empty data to prevent 404 errors
-    console.log('⚠️ Breaks functionality not available (table does not exist)');
-    return { data: [], error: null };
+    const { data, error } = await supabase
+      .from('break_entries')
+      .select('*, time_entries(*, user_profiles(*))')
+      .eq('time_entries.branch_id', branchId)
+      .is('clock_out_time', null);
+    return { data, error };
   },
 
   async calculateScheduledHours(userId: string, startDate: string, endDate: string) {
@@ -489,15 +492,25 @@ export const timeTrackingService = {
   },
 
   async endBreak(breakId: string) {
-    // Breaks table doesn't exist - return success to prevent 404 errors
-    console.log('⚠️ Breaks functionality not available (table does not exist)');
-    return { data: null, error: { message: 'Break functionality is not available' } };
+    const { data, error } = await supabase
+      .from('break_entries')
+      .update({ clock_out_time: new Date().toISOString() })
+      .eq('id', breakId)
+      .select()
+      .single();
+    return { data, error };
   },
 
   async startBreak(breakData: any) {
-    // Breaks table doesn't exist - return success to prevent 404 errors
-    console.log('⚠️ Breaks functionality not available (table does not exist)');
-    return { data: null, error: { message: 'Break functionality is not available' } };
+    const { data, error } = await supabase
+      .from('break_entries')
+      .insert({
+        ...breakData,
+        clock_in_time: new Date().toISOString()
+      })
+      .select()
+      .single();
+    return { data, error };
   },
 
   async getCurrentTimeEntry(userId: string) {
@@ -513,9 +526,13 @@ export const timeTrackingService = {
   },
 
   async getActiveBreak(timeEntryId: string) {
-    // Breaks table doesn't exist - return null to prevent 404 errors
-    console.log('⚠️ Breaks functionality not available (table does not exist)');
-    return { data: null, error: null };
+    const { data, error } = await supabase
+      .from('break_entries')
+      .select('*')
+      .eq('time_entry_id', timeEntryId)
+      .is('clock_out_time', null)
+      .maybeSingle();
+    return { data, error };
   },
 
   async clockIn(clockInData: any) {

@@ -139,17 +139,13 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
     try {
       const { data, error } = await timeTrackingService.getActiveBreak(currentEntry.id);
       if (error) {
-        // Check if it's the expected "breaks table doesn't exist" error
-        if (error.code === '42P01' || error.message?.includes('breaks')) {
-          console.log('⚠️ Breaks functionality not available (table does not exist)');
-        } else {
-          console.error('Error loading current break:', error);
-        }
+        console.error('Error loading current break:', error);
       } else {
+        console.log('✅ Break status loaded:', data ? 'On break' : 'Not on break');
         setCurrentBreak(data);
       }
     } catch (error) {
-      console.log('⚠️ Breaks functionality not available');
+      console.error('Exception loading current break:', error);
     }
   };
 
@@ -481,15 +477,55 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
   };
 
   const handleStartBreak = async () => {
-    // Break functionality is not available since breaks table doesn't exist
-    alert('Break functionality is currently not available.\n\nPlease speak with your supervisor if you need to take a break.');
-    return;
+    if (!currentEntry) return;
+
+    setBreakLoading(true);
+    try {
+      const { data, error } = await timeTrackingService.startBreak({
+        time_entry_id: currentEntry.id,
+        break_type: 'break',
+        notes: notes.trim() || undefined
+      });
+
+      if (error) {
+        console.error('❌ Failed to start break:', error);
+        alert('Failed to start break: ' + error.message);
+      } else {
+        console.log('✅ Break started successfully:', data);
+        setCurrentBreak(data);
+        setNotes('');
+        setShowNotes(false);
+        alert('✅ Break started!');
+      }
+    } catch (error: any) {
+      console.error('❌ Exception starting break:', error);
+      alert('Error starting break: ' + error.message);
+    } finally {
+      setBreakLoading(false);
+    }
   };
 
   const handleEndBreak = async () => {
-    // Break functionality is not available since breaks table doesn't exist
-    alert('Break functionality is currently not available.');
-    return;
+    if (!currentBreak) return;
+
+    setBreakLoading(true);
+    try {
+      const { data, error } = await timeTrackingService.endBreak(currentBreak.id);
+
+      if (error) {
+        console.error('❌ Failed to end break:', error);
+        alert('Failed to end break: ' + error.message);
+      } else {
+        console.log('✅ Break ended successfully:', data);
+        setCurrentBreak(null);
+        alert('✅ Break ended!');
+      }
+    } catch (error: any) {
+      console.error('❌ Exception ending break:', error);
+      alert('Error ending break: ' + error.message);
+    } finally {
+      setBreakLoading(false);
+    }
   };
 
   const getStatusColor = () => {
@@ -758,23 +794,44 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
           </button>
         )}
 
-        {/* Break Controls - Currently Disabled */}
+        {/* Break Controls */}
         {currentEntry && !currentEntry.clock_out_time && (
           <div className="grid grid-cols-1 gap-2">
-            <button
-              onClick={handleStartBreak}
-              disabled={true}
-              className="w-full bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 cursor-not-allowed"
-              title="Break functionality is currently not available"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
-              </svg>
-              <span>Break (Not Available)</span>
-            </button>
-            <p className="text-xs text-gray-500 text-center">
-              Break functionality is temporarily unavailable
-            </p>
+            {currentBreak ? (
+              <button
+                onClick={handleEndBreak}
+                disabled={breakLoading}
+                className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+              >
+                {breakLoading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>End Break</span>
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={handleStartBreak}
+                disabled={breakLoading}
+                className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+              >
+                {breakLoading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h8m-10 5V7a3 3 0 013-3h4a3 3 0 013 3v12l-5-3-5 3z" />
+                    </svg>
+                    <span>Take a Break</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         )}
         
