@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { timeTrackingService, TimeEntry, BranchLocation } from '../lib/supabase-secure';
+import { timeTrackingService, TimeEntry, BranchLocation, supabase } from '../lib/supabase-secure';
 import { improvedLocationService, LocationResult, LocationCheckResult } from '../lib/improved-location-service';
 
 interface ImprovedClockInOutProps {
@@ -448,16 +448,36 @@ const ImprovedClockInOut: React.FC<ImprovedClockInOutProps> = ({ userId, userBra
         const refreshWithRetry = async (retryCount = 0) => {
           console.log(`🔄 Force refreshing after clock-out (attempt ${retryCount + 1})...`);
           try {
-            const { data, error } = await timeTrackingService.getCurrentTimeEntry(userId);
-            if (error) {
-              console.error(`❌ Refresh attempt ${retryCount + 1} failed:`, error);
-              if (retryCount < 2) {
-                console.log(`⏳ Retrying in ${1000 * (retryCount + 1)}ms...`);
-                setTimeout(() => refreshWithRetry(retryCount + 1), 1000 * (retryCount + 1));
+            // First, verify the entry we just clocked out is actually closed
+            const { data: updatedEntry } = await supabase
+              .from('time_entries')
+              .select('*')
+              .eq('id', currentEntry.id)
+              .single();
+            
+            if (updatedEntry?.clock_out_time) {
+              console.log(`✅ Confirmed entry ${currentEntry.id} is now closed:`, updatedEntry);
+              // The entry is closed, now check if there are any other active entries
+              const { data: activeEntry, error } = await timeTrackingService.getCurrentTimeEntry(userId);
+              if (error) {
+                console.error(`❌ Refresh attempt ${retryCount + 1} failed:`, error);
+                if (retryCount < 2) {
+                  setTimeout(() => refreshWithRetry(retryCount + 1), 1000 * (retryCount + 1));
+                }
+              } else {
+                if (activeEntry) {
+                  console.log(`⚠️ Found another active entry:`, activeEntry);
+                  console.log(`⚠️ User has multiple open time entries - this may need admin attention`);
+                } else {
+                  console.log(`✅ No active entries found - user is properly clocked out`);
+                }
+                setCurrentEntry(activeEntry);
               }
             } else {
-              console.log(`✅ Refresh attempt ${retryCount + 1} successful:`, data);
-              setCurrentEntry(data);
+              console.log(`⚠️ Entry ${currentEntry.id} is not yet closed, retrying...`);
+              if (retryCount < 2) {
+                setTimeout(() => refreshWithRetry(retryCount + 1), 1000 * (retryCount + 1));
+              }
             }
           } catch (error) {
             console.error(`❌ Exception on refresh attempt ${retryCount + 1}:`, error);

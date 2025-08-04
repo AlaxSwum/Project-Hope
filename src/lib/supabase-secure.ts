@@ -390,8 +390,8 @@ export const realtimeService = {
   // Subscribe to user progress updates
   subscribeToUserProgress(callback: (payload: any) => void) {
     return supabase
-      .channel('user_progress')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_progress' }, callback)
+      .channel('user_checklist_progress')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_checklist_progress' }, callback)
       .subscribe();
   },
 
@@ -546,7 +546,24 @@ export const timeTrackingService = {
     const { data, error } = await supabase
       .from('time_entries')
       .update({ clock_out_time: new Date().toISOString(), ...clockOutData })
-      .eq('id', timeEntryId);
+      .eq('id', timeEntryId)
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  async closeAllOpenEntries(userId: string, excludeId?: string) {
+    const query = supabase
+      .from('time_entries')
+      .update({ clock_out_time: new Date().toISOString() })
+      .eq('user_id', userId)
+      .is('clock_out_time', null);
+    
+    if (excludeId) {
+      query.neq('id', excludeId);
+    }
+    
+    const { data, error } = await query.select();
     return { data, error };
   },
 
@@ -578,7 +595,7 @@ export const checklistService = {
 
   async getUserProgress(userId: string) {
     const { data, error } = await supabase
-      .from('user_progress')
+      .from('user_checklist_progress')
       .select('*')
       .eq('user_id', userId);
     return { data, error };
@@ -587,7 +604,7 @@ export const checklistService = {
   async getDailyStatus(userId: string) {
     const today = new Date().toISOString().split('T')[0];
     const { data, error } = await supabase
-      .from('user_progress')
+      .from('user_checklist_progress')
       .select('*')
       .eq('user_id', userId)
       .gte('completed_at', today)
@@ -606,14 +623,14 @@ export const checklistService = {
 
   async updateItemProgress(progressData: any) {
     const { error } = await supabase
-      .from('user_progress')
+      .from('user_checklist_progress')
       .upsert(progressData);
     return { error };
   },
 
   async getFolders(branchId: string) {
     const { data, error } = await supabase
-      .from('folders')
+      .from('checklist_folders')
       .select('*')
       .eq('branch_id', branchId);
     return { data, error };
@@ -629,7 +646,7 @@ export const checklistService = {
 
   async deleteFolder(folderId: string) {
     const { error } = await supabase
-      .from('folders')
+      .from('checklist_folders')
       .delete()
       .eq('id', folderId);
     return { error };
