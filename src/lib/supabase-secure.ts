@@ -683,7 +683,7 @@ export const checklistService = {
 
   async createFolder(folderData: any) {
     const { error } = await supabase
-      .from('folders')
+      .from('checklist_folders')
       .insert(folderData);
     return { error };
   },
@@ -725,7 +725,7 @@ export const checklistService = {
 
   async updateFolder(folderId: string, folderData: any) {
     const { error } = await supabase
-      .from('folders')
+      .from('checklist_folders')
       .update(folderData)
       .eq('id', folderId);
     return { error };
