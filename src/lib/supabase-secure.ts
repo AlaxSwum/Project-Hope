@@ -628,19 +628,31 @@ export const checklistService = {
     return { error };
   },
 
-  async getFolders(branchId: string) {
-    const { data, error } = await supabase
+  async getFolders(branchId?: string) {
+    let query = supabase
       .from('checklist_folders')
-      .select('*')
-      .eq('branch_id', branchId);
+      .select('*');
+    
+    // Only filter by branch_id if branchId is provided
+    if (branchId) {
+      query = query.eq('branch_id', branchId);
+    }
+    
+    const { data, error } = await query;
     return { data, error };
   },
 
-  async getChecklists(folderId: string) {
-    const { data, error } = await supabase
+  async getChecklists(folderId?: string) {
+    let query = supabase
       .from('checklists')
-      .select('*')
-      .eq('folder_id', folderId);
+      .select('*');
+    
+    // Only filter by folder_id if folderId is provided
+    if (folderId) {
+      query = query.eq('folder_id', folderId);
+    }
+    
+    const { data, error } = await query;
     return { data, error };
   },
 
