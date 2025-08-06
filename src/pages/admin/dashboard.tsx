@@ -5,11 +5,16 @@ import { useRouter } from 'next/router';
 import { authService, userService, UserData } from '../../lib/supabase-secure';
 import { checklistService, timeTrackingService } from '../../lib/supabase-secure';
 import { branchService } from '../../lib/branch-service';
+import { passwordManagerService, PasswordFolder, PasswordEntry } from '../../lib/password-manager-service';
 import BranchLocationPicker from '../../components/BranchLocationPicker';
 import BranchCard from '../../components/BranchCard';
 import BranchTimeManagement from '../../components/BranchTimeManagement';
 import AssignStaffModal from '../../components/AssignStaffModal';
 import HolidayManagement from '../../components/HolidayManagement';
+import { PasswordFolderModal } from '../../components/PasswordFolderModal';
+import { PasswordEntryModal } from '../../components/PasswordEntryModal';
+import { PasswordDetailsModal } from '../../components/PasswordDetailsModal';
+import { PasswordShareModal } from '../../components/PasswordShareModal';
 import { toast } from 'react-toastify';
 
 const AdminDashboard: NextPage = () => {
@@ -87,6 +92,21 @@ const AdminDashboard: NextPage = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM format
   const [loadingPayslips, setLoadingPayslips] = useState(false);
 
+  // Password Manager states
+  const [passwordFolders, setPasswordFolders] = useState<PasswordFolder[]>([]);
+  const [passwordEntries, setPasswordEntries] = useState<PasswordEntry[]>([]);
+  const [selectedPasswordFolder, setSelectedPasswordFolder] = useState<PasswordFolder | null>(null);
+  const [selectedPasswordEntry, setSelectedPasswordEntry] = useState<PasswordEntry | null>(null);
+  const [showCreatePasswordFolder, setShowCreatePasswordFolder] = useState(false);
+  const [showCreatePasswordEntry, setShowCreatePasswordEntry] = useState(false);
+  const [showEditPasswordFolder, setShowEditPasswordFolder] = useState(false);
+  const [showEditPasswordEntry, setShowEditPasswordEntry] = useState(false);
+  const [showPasswordDetails, setShowPasswordDetails] = useState(false);
+  const [showSharePassword, setShowSharePassword] = useState(false);
+  const [editingPasswordFolder, setEditingPasswordFolder] = useState<PasswordFolder | null>(null);
+  const [editingPasswordEntry, setEditingPasswordEntry] = useState<PasswordEntry | null>(null);
+  const [loadingPasswords, setLoadingPasswords] = useState(false);
+
   useEffect(() => {
     checkAuth();
     loadUsers();
@@ -102,6 +122,9 @@ const AdminDashboard: NextPage = () => {
     }
     if (activeSection === 'payslips') {
       loadPayslipData();
+    }
+    if (activeSection === 'passwords') {
+      loadPasswordFolders();
     }
   }, [activeSection, monitoringDate, currentMonth]);
 
@@ -542,6 +565,191 @@ const AdminDashboard: NextPage = () => {
     }
   };
 
+  // Password Manager functions
+  const loadPasswordFolders = async () => {
+    setLoadingPasswords(true);
+    try {
+      const { data, error } = await passwordManagerService.getFolders();
+      if (error) {
+        console.error('Failed to load password folders:', error);
+        toast.error('Failed to load password folders');
+      } else {
+        setPasswordFolders(data || []);
+      }
+    } catch (error) {
+      console.error('Error loading password folders:', error);
+      toast.error('Error loading password folders');
+    } finally {
+      setLoadingPasswords(false);
+    }
+  };
+
+  const loadPasswordEntries = async (folderId?: string) => {
+    try {
+      const { data, error } = await passwordManagerService.getPasswordEntries(folderId);
+      if (error) {
+        console.error('Failed to load password entries:', error);
+        toast.error('Failed to load password entries');
+      } else {
+        setPasswordEntries(data || []);
+      }
+    } catch (error) {
+      console.error('Error loading password entries:', error);
+      toast.error('Error loading password entries');
+    }
+  };
+
+  const handlePasswordFolderSelect = (folder: PasswordFolder) => {
+    setSelectedPasswordFolder(folder);
+    setSelectedPasswordEntry(null);
+    loadPasswordEntries(folder.id);
+  };
+
+  const handlePasswordEntrySelect = (entry: PasswordEntry) => {
+    setSelectedPasswordEntry(entry);
+    setShowPasswordDetails(true);
+  };
+
+  const handleCreatePasswordFolder = async (folderData: Omit<PasswordFolder, 'id' | 'created_at' | 'updated_at' | 'created_by'>) => {
+    try {
+      const { error } = await passwordManagerService.createFolder(folderData);
+      if (error) {
+        toast.error('Error creating password folder: ' + error.message);
+      } else {
+        toast.success('Password folder created successfully');
+        loadPasswordFolders();
+        setShowCreatePasswordFolder(false);
+      }
+    } catch (error) {
+      toast.error('Error creating password folder');
+    }
+  };
+
+  const handleCreatePasswordEntry = async (entryData: Omit<PasswordEntry, 'id' | 'created_at' | 'updated_at' | 'created_by'>) => {
+    try {
+      const { error } = await passwordManagerService.createPasswordEntry(entryData);
+      if (error) {
+        toast.error('Error creating password entry: ' + error.message);
+      } else {
+        toast.success('Password entry created successfully');
+        if (selectedPasswordFolder) {
+          loadPasswordEntries(selectedPasswordFolder.id);
+        }
+        setShowCreatePasswordEntry(false);
+      }
+    } catch (error) {
+      toast.error('Error creating password entry');
+    }
+  };
+
+  const handleEditPasswordFolder = (folder: PasswordFolder) => {
+    setEditingPasswordFolder(folder);
+    setShowEditPasswordFolder(true);
+  };
+
+  const handleEditPasswordEntry = (entry: PasswordEntry) => {
+    setEditingPasswordEntry(entry);
+    setShowEditPasswordEntry(true);
+  };
+
+  const handleUpdatePasswordFolder = async (id: string, updates: Partial<PasswordFolder>) => {
+    try {
+      const { error } = await passwordManagerService.updateFolder(id, updates);
+      if (error) {
+        toast.error('Error updating password folder: ' + error.message);
+      } else {
+        toast.success('Password folder updated successfully');
+        loadPasswordFolders();
+        setShowEditPasswordFolder(false);
+        setEditingPasswordFolder(null);
+      }
+    } catch (error) {
+      toast.error('Error updating password folder');
+    }
+  };
+
+  const handleUpdatePasswordEntry = async (id: string, updates: Partial<PasswordEntry>) => {
+    try {
+      const { error } = await passwordManagerService.updatePasswordEntry(id, updates);
+      if (error) {
+        toast.error('Error updating password entry: ' + error.message);
+      } else {
+        toast.success('Password entry updated successfully');
+        if (selectedPasswordFolder) {
+          loadPasswordEntries(selectedPasswordFolder.id);
+        }
+        setShowEditPasswordEntry(false);
+        setEditingPasswordEntry(null);
+      }
+    } catch (error) {
+      toast.error('Error updating password entry');
+    }
+  };
+
+  const handleDeletePasswordFolder = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete the folder "${name}"? This will also delete all passwords inside it.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await passwordManagerService.deleteFolder(id);
+      if (error) {
+        toast.error('Error deleting password folder: ' + error.message);
+      } else {
+        toast.success('Password folder deleted successfully');
+        loadPasswordFolders();
+        if (selectedPasswordFolder?.id === id) {
+          setSelectedPasswordFolder(null);
+          setPasswordEntries([]);
+        }
+      }
+    } catch (error) {
+      toast.error('Error deleting password folder');
+    }
+  };
+
+  const handleDeletePasswordEntry = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete the password entry "${name}"?`)) {
+      return;
+    }
+
+    try {
+      const { error } = await passwordManagerService.deletePasswordEntry(id);
+      if (error) {
+        toast.error('Error deleting password entry: ' + error.message);
+      } else {
+        toast.success('Password entry deleted successfully');
+        if (selectedPasswordFolder) {
+          loadPasswordEntries(selectedPasswordFolder.id);
+        }
+        if (selectedPasswordEntry?.id === id) {
+          setSelectedPasswordEntry(null);
+          setShowPasswordDetails(false);
+        }
+      }
+    } catch (error) {
+      toast.error('Error deleting password entry');
+    }
+  };
+
+  const handleSharePassword = async (entryId: string, permissions: any[]) => {
+    try {
+      const { error } = await passwordManagerService.sharePassword(entryId, permissions);
+      if (error) {
+        toast.error('Error sharing password: ' + error.message);
+      } else {
+        toast.success('Password sharing updated successfully');
+        if (selectedPasswordFolder) {
+          loadPasswordEntries(selectedPasswordFolder.id);
+        }
+        setShowSharePassword(false);
+        setSelectedPasswordEntry(null);
+      }
+    } catch (error) {
+      toast.error('Error sharing password');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -631,6 +839,16 @@ const AdminDashboard: NextPage = () => {
               </svg>
             ),
             current: activeSection === 'holidays'
+          },
+          {
+            name: 'Password Manager',
+            id: 'passwords',
+            icon: (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+            ),
+            current: activeSection === 'passwords'
           },
     { 
       name: 'Overview', 
@@ -909,6 +1127,7 @@ const AdminDashboard: NextPage = () => {
                        activeSection === 'branches' ? 'Branch Management' : 
                        activeSection === 'sop' ? 'SOP Management' : 
                        activeSection === 'payslips' ? 'Payslip Management' : 
+                       activeSection === 'passwords' ? 'Password Manager' : 
                        activeSection}
                     </h2>
                     <p className="text-sm text-gray-500">{formattedDate}</p>
@@ -2544,6 +2763,316 @@ const AdminDashboard: NextPage = () => {
                 </div>
               )}
 
+              {/* Password Manager Section */}
+              {activeSection === 'passwords' && (
+                <div className="space-y-6">
+                  {/* Header */}
+                  <div className="bg-gradient-to-r from-red-600 to-orange-600 rounded-2xl p-8 text-white">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h1 className="text-3xl font-bold mb-2">Password Manager</h1>
+                        <p className="text-red-100 text-lg">Securely manage and share credentials across your organization</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-3xl font-bold">{passwordFolders.length}</div>
+                        <div className="text-red-200 text-sm">Active Folders</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {!selectedPasswordFolder ? (
+                    <>
+                      {/* Quick Actions */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
+                        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                              </div>
+                            </div>
+                            <div className="ml-4">
+                              <p className="text-sm font-medium text-gray-500">Create New</p>
+                              <p className="text-2xl font-bold text-gray-900">Folder</p>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => setShowCreatePasswordFolder(true)}
+                            className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                            Add Folder
+                          </button>
+                        </div>
+
+                        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                </svg>
+                              </div>
+                            </div>
+                            <div className="ml-4">
+                              <p className="text-sm font-medium text-gray-500">Security</p>
+                              <p className="text-2xl font-bold text-gray-900">Strong</p>
+                            </div>
+                          </div>
+                          <div className="mt-4 text-sm text-gray-600">
+                            All passwords are encrypted and secured
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Password Folders Grid */}
+                      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="p-6 border-b border-gray-200 bg-red-50">
+                          <h3 className="text-xl font-semibold text-gray-900">Password Folders</h3>
+                          <p className="text-sm text-gray-500 mt-1">Organize your credentials into secure folders</p>
+                        </div>
+                        
+                        <div className="p-6">
+                          {loadingPasswords ? (
+                            <div className="text-center py-16">
+                              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
+                              <p className="mt-4 text-gray-600">Loading password folders...</p>
+                            </div>
+                          ) : passwordFolders.length === 0 ? (
+                            <div className="text-center py-16">
+                              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                </svg>
+                              </div>
+                              <h4 className="text-lg font-semibold text-gray-900 mb-2">No password folders yet</h4>
+                              <p className="text-gray-500 mb-6">Create your first folder to organize credentials</p>
+                              <button 
+                                onClick={() => setShowCreatePasswordFolder(true)}
+                                className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium">
+                                Create First Folder
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                              {passwordFolders.map((folder) => (
+                                <div
+                                  key={folder.id}
+                                  className="bg-gray-50 hover:bg-gray-100 rounded-xl p-6 transition-all duration-200 border-2 border-transparent hover:border-red-200 hover:shadow-md group cursor-pointer"
+                                  onClick={() => handlePasswordFolderSelect(folder)}
+                                >
+                                  <div className="flex items-start space-x-4">
+                                    <div 
+                                      className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm"
+                                      style={{ backgroundColor: folder.color }}
+                                    >
+                                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                      </svg>
+                                    </div>
+                                    <div className="flex-1">
+                                      <h4 className="font-semibold text-gray-900 text-lg mb-2">{folder.name}</h4>
+                                      {folder.description && (
+                                        <p className="text-sm text-gray-500 mb-3">{folder.description}</p>
+                                      )}
+                                      <div className="flex items-center text-xs text-gray-400">
+                                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                        </svg>
+                                        {folder.password_count || 0} passwords
+                                      </div>
+                                    </div>
+                                    <div className="flex flex-col space-y-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleEditPasswordFolder(folder);
+                                        }}
+                                        className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                        title="Edit folder"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeletePasswordFolder(folder.id, folder.name);
+                                        }}
+                                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                                        title="Delete folder"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    /* Password Folder Detail View */
+                    <div className="space-y-6">
+                      {/* Back button and folder info */}
+                      <div className="flex items-center space-x-4">
+                        <button
+                          onClick={() => {
+                            setSelectedPasswordFolder(null);
+                            setSelectedPasswordEntry(null);
+                            setPasswordEntries([]);
+                          }}
+                          className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 bg-white rounded-lg px-4 py-2 border border-gray-200 hover:border-gray-300 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                          </svg>
+                          <span>Back to Folders</span>
+                        </button>
+                        
+                        <div className="flex items-center space-x-3">
+                          <div 
+                            className="w-8 h-8 rounded-lg"
+                            style={{ backgroundColor: selectedPasswordFolder.color }}
+                          ></div>
+                          <div>
+                            <h3 className="text-xl font-semibold text-gray-900">{selectedPasswordFolder.name}</h3>
+                            <p className="text-sm text-gray-500">{selectedPasswordFolder.description}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Password Entries in selected folder */}
+                      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="p-6 border-b border-gray-200 bg-orange-50">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <h3 className="text-lg font-semibold text-gray-900">Password Entries</h3>
+                              <p className="text-sm text-gray-500 mt-1">Manage passwords in this folder</p>
+                            </div>
+                            <button 
+                              onClick={() => setShowCreatePasswordEntry(true)}
+                              className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                              </svg>
+                              <span>Add Password</span>
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <div className="p-6">
+                          {passwordEntries.length === 0 ? (
+                            <div className="text-center py-16">
+                              <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-10 h-10 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                </svg>
+                              </div>
+                              <h4 className="text-lg font-semibold text-gray-900 mb-2">No passwords in this folder</h4>
+                              <p className="text-gray-500 mb-6">Create your first password entry for this folder</p>
+                              <button 
+                                onClick={() => setShowCreatePasswordEntry(true)}
+                                className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg font-medium">
+                                Create First Password
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              {passwordEntries.map((entry) => (
+                                <div
+                                  key={entry.id}
+                                  className="bg-gray-50 hover:bg-gray-100 rounded-xl p-6 transition-all duration-200 border-2 border-transparent hover:border-orange-200 hover:shadow-md group cursor-pointer"
+                                  onClick={() => handlePasswordEntrySelect(entry)}
+                                >
+                                  <div className="flex justify-between items-start mb-3">
+                                    <h4 className="font-semibold text-gray-900 text-lg flex-1">
+                                      {entry.name}
+                                    </h4>
+                                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleEditPasswordEntry(entry);
+                                        }}
+                                        className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                        title="Edit password"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeletePasswordEntry(entry.id, entry.name);
+                                        }}
+                                        className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                        title="Delete password"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="space-y-2 text-sm">
+                                    {entry.website_name && (
+                                      <div className="flex items-center text-gray-600">
+                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-3a5 5 0 00-5-5 5 5 0 00-5 5v3m9-9v-3a5 5 0 00-5-5 5 5 0 00-5 5v3" />
+                                        </svg>
+                                        {entry.website_name}
+                                      </div>
+                                    )}
+                                    {entry.email && (
+                                      <div className="flex items-center text-gray-600">
+                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                                        </svg>
+                                        {entry.email}
+                                      </div>
+                                    )}
+                                    {entry.username && (
+                                      <div className="flex items-center text-gray-600">
+                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                        {entry.username}
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  <div className="flex items-center justify-between mt-4">
+                                    <span className="text-xs text-gray-400">Click to view details</span>
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedPasswordEntry(entry);
+                                        setShowSharePassword(true);
+                                      }}
+                                      className="text-orange-600 hover:text-orange-700 text-sm font-medium"
+                                    >
+                                      Share
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Settings Section */}
               {activeSection === 'settings' && (
                 <div className="text-center py-20">
@@ -2715,6 +3244,83 @@ const AdminDashboard: NextPage = () => {
             onSave={handleLocationSave}
           />
         )}
+
+        {/* Password Manager Modals */}
+        <PasswordFolderModal
+          isOpen={showCreatePasswordFolder}
+          onClose={() => setShowCreatePasswordFolder(false)}
+          onSave={handleCreatePasswordFolder}
+          mode="create"
+        />
+
+        <PasswordFolderModal
+          isOpen={showEditPasswordFolder}
+          onClose={() => {
+            setShowEditPasswordFolder(false);
+            setEditingPasswordFolder(null);
+          }}
+          onSave={(folderData) => {
+            if (editingPasswordFolder) {
+              handleUpdatePasswordFolder(editingPasswordFolder.id, folderData);
+            }
+          }}
+          folder={editingPasswordFolder}
+          mode="edit"
+        />
+
+        <PasswordEntryModal
+          isOpen={showCreatePasswordEntry}
+          onClose={() => setShowCreatePasswordEntry(false)}
+          onSave={handleCreatePasswordEntry}
+          mode="create"
+          selectedFolderId={selectedPasswordFolder?.id}
+          folders={passwordFolders}
+        />
+
+        <PasswordEntryModal
+          isOpen={showEditPasswordEntry}
+          onClose={() => {
+            setShowEditPasswordEntry(false);
+            setEditingPasswordEntry(null);
+          }}
+          onSave={(entryData) => {
+            if (editingPasswordEntry) {
+              handleUpdatePasswordEntry(editingPasswordEntry.id, entryData);
+            }
+          }}
+          entry={editingPasswordEntry}
+          mode="edit"
+          selectedFolderId={selectedPasswordFolder?.id}
+          folders={passwordFolders}
+        />
+
+        <PasswordDetailsModal
+          isOpen={showPasswordDetails}
+          onClose={() => {
+            setShowPasswordDetails(false);
+            setSelectedPasswordEntry(null);
+          }}
+          entry={selectedPasswordEntry}
+          onEdit={(entry) => {
+            setShowPasswordDetails(false);
+            handleEditPasswordEntry(entry);
+          }}
+          onShare={(entry) => {
+            setShowPasswordDetails(false);
+            setSelectedPasswordEntry(entry);
+            setShowSharePassword(true);
+          }}
+        />
+
+        <PasswordShareModal
+          isOpen={showSharePassword}
+          onClose={() => {
+            setShowSharePassword(false);
+            setSelectedPasswordEntry(null);
+          }}
+          entry={selectedPasswordEntry}
+          onSave={handleSharePassword}
+        />
 
         {/* Employee Details Modal */}
         {showEmployeeDetails && selectedEmployee && (

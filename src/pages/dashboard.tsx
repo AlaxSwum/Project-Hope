@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { authService, userService, supabase } from '../lib/supabase-secure';
 import { checklistService, timeTrackingService } from '../lib/supabase-secure';
+import { passwordManagerService, PasswordEntry } from '../lib/password-manager-service';
+import { PasswordDetailsModal } from '../components/PasswordDetailsModal';
 import ImprovedClockInOut from '../components/ImprovedClockInOut';
 
 const Dashboard: NextPage = () => {
@@ -27,6 +29,12 @@ const Dashboard: NextPage = () => {
   const [userProgress, setUserProgress] = useState<any[]>([]);
   const [dailyStatus, setDailyStatus] = useState<any[]>([]);
 
+  // Password Manager state
+  const [userPasswords, setUserPasswords] = useState<PasswordEntry[]>([]);
+  const [selectedPassword, setSelectedPassword] = useState<PasswordEntry | null>(null);
+  const [showPasswordDetails, setShowPasswordDetails] = useState(false);
+  const [loadingPasswords, setLoadingPasswords] = useState(false);
+
   useEffect(() => {
     checkAuth();
   }, []);
@@ -39,6 +47,9 @@ const Dashboard: NextPage = () => {
     }
     if (currentUser && activeSection === 'timetracking') {
       loadTotalHours();
+    }
+    if (currentUser && activeSection === 'passwords') {
+      loadUserAccessiblePasswords();
     }
   }, [currentUser, activeSection]);
 
@@ -235,6 +246,22 @@ const Dashboard: NextPage = () => {
     }
   };
 
+  const loadUserAccessiblePasswords = async () => {
+    setLoadingPasswords(true);
+    try {
+      const { data, error } = await passwordManagerService.getUserAccessiblePasswords();
+      if (error) {
+        console.error('Failed to load user passwords:', error);
+      } else {
+        setUserPasswords(data || []);
+      }
+    } catch (error) {
+      console.error('Error loading user passwords:', error);
+    } finally {
+      setLoadingPasswords(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -309,6 +336,16 @@ const Dashboard: NextPage = () => {
       ), 
       current: activeSection === 'checklists',
       count: userChecklists.length
+    },
+    { 
+      name: 'Password Manager', 
+      id: 'passwords', 
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+        </svg>
+      ), 
+      current: activeSection === 'passwords'
     },
     { 
       name: 'Reports', 
@@ -998,6 +1035,114 @@ const Dashboard: NextPage = () => {
                 </div>
               )}
 
+              {/* Password Manager Section */}
+              {activeSection === 'passwords' && (
+                <div className="space-y-6">
+                  {/* Header */}
+                  <div className="bg-gradient-to-r from-red-600 to-orange-600 rounded-2xl p-8 text-white">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h1 className="text-3xl font-bold mb-2">Password Manager</h1>
+                        <p className="text-red-100 text-lg">Access your shared passwords securely</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-3xl font-bold">{userPasswords.length}</div>
+                        <div className="text-red-200 text-sm">Available Passwords</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="p-6 border-b border-gray-200 bg-red-50">
+                      <h3 className="text-xl font-semibold text-gray-900">Shared Passwords</h3>
+                      <p className="text-sm text-gray-500 mt-1">Passwords that have been shared with you</p>
+                    </div>
+                    
+                    <div className="p-6">
+                      {loadingPasswords ? (
+                        <div className="text-center py-16">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
+                          <p className="mt-4 text-gray-600">Loading passwords...</p>
+                        </div>
+                      ) : userPasswords.length === 0 ? (
+                        <div className="text-center py-16">
+                          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                            </svg>
+                          </div>
+                          <h4 className="text-lg font-semibold text-gray-900 mb-2">No passwords shared with you</h4>
+                          <p className="text-gray-500">When administrators share passwords with you, they will appear here</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {/* Group passwords by folder */}
+                          {Object.entries(userPasswords.reduce((acc, password) => {
+                            const folderName = password.folder_name || 'No Folder';
+                            if (!acc[folderName]) acc[folderName] = [];
+                            acc[folderName].push(password);
+                            return acc;
+                          }, {} as {[key: string]: PasswordEntry[]})).map(([folderName, passwords]) => (
+                            <div key={folderName} className="border border-gray-200 rounded-lg">
+                              <div className="p-4 bg-gray-50 border-b border-gray-200">
+                                <div className="flex items-center space-x-2">
+                                  <div 
+                                    className="w-4 h-4 rounded"
+                                    style={{ backgroundColor: passwords[0]?.folder_color || '#6366f1' }}
+                                  ></div>
+                                  <h4 className="font-medium text-gray-900">{folderName}</h4>
+                                  <span className="text-sm text-gray-500">({passwords.length} passwords)</span>
+                                </div>
+                              </div>
+                              <div className="p-4 space-y-3">
+                                {passwords.map((password) => (
+                                  <div
+                                    key={password.id}
+                                    onClick={() => {
+                                      setSelectedPassword(password);
+                                      setShowPasswordDetails(true);
+                                    }}
+                                    className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                                  >
+                                    <div className="flex-1">
+                                      <h5 className="font-medium text-gray-900">{password.name}</h5>
+                                      <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
+                                        {password.website_name && (
+                                          <span>{password.website_name}</span>
+                                        )}
+                                        {password.email && (
+                                          <span>{password.email}</span>
+                                        )}
+                                        {password.username && (
+                                          <span>@{password.username}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                        password.can_edit 
+                                          ? 'bg-green-100 text-green-800' 
+                                          : 'bg-blue-100 text-blue-800'
+                                      }`}>
+                                        {password.can_edit ? 'Can Edit' : 'View Only'}
+                                      </span>
+                                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                      </svg>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {activeSection === 'settings' && (
                 <div className="text-center py-20">
                   <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -1028,6 +1173,24 @@ const Dashboard: NextPage = () => {
           onItemToggle={handleItemToggle}
         />
       )}
+
+      {/* Password Details Modal */}
+      <PasswordDetailsModal
+        isOpen={showPasswordDetails}
+        onClose={() => {
+          setShowPasswordDetails(false);
+          setSelectedPassword(null);
+        }}
+        entry={selectedPassword}
+        onEdit={() => {
+          // Regular users can't edit, but we can show a message or redirect to admin
+          alert('Please contact an administrator to edit this password entry.');
+        }}
+        onShare={() => {
+          // Regular users can't share
+          alert('Please contact an administrator to manage password sharing.');
+        }}
+      />
     </>
   );
 };
