@@ -298,7 +298,10 @@ export const passwordManagerService = {
   async getUserAccessiblePasswords(): Promise<{ data: PasswordEntry[] | null; error: any }> {
     try {
       const { data, error } = await supabase
-        .rpc('get_user_accessible_passwords');
+        .from('user_accessible_passwords')
+        .select('*')
+        .order('folder_name', { ascending: true })
+        .order('name', { ascending: true });
 
       if (data) {
         // Decrypt passwords for display
