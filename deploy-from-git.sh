@@ -9,7 +9,7 @@ set -e  # Exit on any error
 SERVER_HOST="195.35.1.75"
 SERVER_USER="root"
 REMOTE_PATH="/var/www/hope-ims"
-GIT_REPO="${1:-https://github.com/your-username/hope-ims.git}"  # Replace with your actual repo
+GIT_REPO="${1:-https://github.com/AlaxSwum/Project-Hope.git}"
 BRANCH="${2:-main}"
 
 echo "🚀 Starting Hope IMS git deployment to $SERVER_HOST"
