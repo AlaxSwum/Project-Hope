@@ -600,21 +600,48 @@ const AdminDashboard: NextPage = () => {
               return total;
             }, 0);
 
-            // Calculate actual worked hours (total time minus breaks)
-            let actualHours = 0;
-            if (clockIn && clockOut) {
-              const totalMinutes = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60);
-              const workMinutes = totalMinutes - totalBreakMinutes;
-              actualHours = Math.max(0, workMinutes / 60);
-            }
-
             // Find scheduled hours for this day
             const daySchedule = scheduleData?.dailySchedule?.find((ds: any) => ds.date === date);
             const scheduledHoursForDay = daySchedule?.scheduledHours || 0;
 
-            // Only include hours up to scheduled hours (no overtime display)
-            // But always pay for actual time worked, even if less than scheduled
-            const displayHours = scheduledHoursForDay > 0 ? Math.min(actualHours, scheduledHoursForDay) : actualHours;
+            // Calculate actual worked hours ONLY within scheduled time slots
+            let actualHours = 0;
+            let payableHours = 0;
+
+            if (clockIn && clockOut && daySchedule) {
+              // Parse scheduled start and end times
+              const [schedStartHour, schedStartMin] = daySchedule.startTime.split(':').map(Number);
+              const [schedEndHour, schedEndMin] = daySchedule.endTime.split(':').map(Number);
+              
+              // Create scheduled time boundaries for this date
+              const scheduleStart = new Date(clockIn);
+              scheduleStart.setHours(schedStartHour, schedStartMin, 0, 0);
+              
+              const scheduleEnd = new Date(clockIn);
+              scheduleEnd.setHours(schedEndHour, schedEndMin, 0, 0);
+
+              // Get actual work period (bounded by schedule)
+              const workStart = new Date(Math.max(clockIn.getTime(), scheduleStart.getTime()));
+              const workEnd = new Date(Math.min(clockOut.getTime(), scheduleEnd.getTime()));
+
+              if (workEnd > workStart) {
+                // Calculate hours worked within schedule
+                const totalMinutes = (workEnd.getTime() - workStart.getTime()) / (1000 * 60);
+                const workMinutes = totalMinutes - totalBreakMinutes;
+                actualHours = Math.max(0, workMinutes / 60);
+                
+                // Payable hours are the actual hours within schedule, capped at scheduled hours
+                payableHours = Math.min(actualHours, scheduledHoursForDay);
+              }
+            } else if (clockIn && clockOut && !daySchedule) {
+              // If no schedule exists, calculate normally (fallback)
+              const totalMinutes = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60);
+              const workMinutes = totalMinutes - totalBreakMinutes;
+              actualHours = Math.max(0, workMinutes / 60);
+              payableHours = actualHours;
+            }
+
+            const displayHours = payableHours;
 
             totalActualHours += actualHours;
             totalBreakHours += totalBreakMinutes / 60;
@@ -626,21 +653,22 @@ const AdminDashboard: NextPage = () => {
               breaks: allBreaks,
               totalBreakMinutes: Math.round(totalBreakMinutes),
               totalBreakHours: Math.round((totalBreakMinutes / 60) * 100) / 100,
-              actualHours: Math.round(actualHours * 100) / 100,
-              displayHours: Math.round(displayHours * 100) / 100, // Hours to display (capped at scheduled)
+              actualHours: Math.round(actualHours * 100) / 100, // Hours worked within schedule
+              displayHours: Math.round(displayHours * 100) / 100, // Payable hours (within schedule)
+              payableHours: Math.round(payableHours * 100) / 100, // Same as displayHours
               scheduledHoursForDay: Math.round(scheduledHoursForDay * 100) / 100,
               daySchedule: daySchedule,
               holidayInfo: firstEntry.holidayInfo, // Use first entry's holiday info
               autoClockOut: lastEntry.autoClockOut,
               date: date,
-              combinedEntries: sortedEntries.length
+              combinedEntries: sortedEntries.length,
+              withinSchedule: !!daySchedule // Flag to indicate if schedule was applied
             };
           });
 
-          // Calculate pay based on actual hours worked, capped at scheduled hours if schedule exists
-          // If no schedule exists, pay for all actual hours worked
-          const payableHours = totalScheduledHours > 0 ? Math.min(totalActualHours, totalScheduledHours) : totalActualHours;
-          const totalPay = payableHours * staffPayRate;
+          // Calculate total payable hours from all processed entries (already schedule-bounded)
+          const totalPayableHours = processedEntries.reduce((sum, entry) => sum + (entry.payableHours || 0), 0);
+          const totalPay = totalPayableHours * staffPayRate;
           
           // Keep track of actual overtime for informational purposes only
           const overtimeHours = Math.max(0, totalActualHours - totalScheduledHours);
@@ -653,12 +681,12 @@ const AdminDashboard: NextPage = () => {
             role: staff.user?.role || 'staff',
             position: staff.position || staff.user?.position || 'Staff',
             timeEntries: processedEntries,
-            totalHours: Math.round(payableHours * 100) / 100, // Show payable hours in summary
+            totalHours: Math.round(totalPayableHours * 100) / 100, // Show payable hours in summary
             totalScheduledHours: Math.round(totalScheduledHours * 100) / 100,
             totalActualHours: Math.round(totalActualHours * 100) / 100,
             totalBreakHours: Math.round(totalBreakHours * 100) / 100,
             overtimeHours: Math.round(overtimeHours * 100) / 100,
-            payableHours: Math.round(payableHours * 100) / 100,
+            payableHours: Math.round(totalPayableHours * 100) / 100,
             totalPay: Math.round(totalPay * 100) / 100,
             scheduleData: scheduleData
           };
@@ -3521,6 +3549,16 @@ const AdminDashboard: NextPage = () => {
                     <span className="font-medium">£{(selectedEmployee.pay_rate || 12.00).toFixed(2)}/hour</span> × 
                     <span className="font-medium ml-1">{formatHoursMinutes(selectedEmployee.totalHours || 0)}</span> = 
                     <span className="font-bold text-green-600 ml-1">£{selectedEmployee.totalPay.toFixed(2)}</span>
+                    <div className="text-xs text-blue-600 mt-2">
+                      ℹ️ Pay calculated only for hours worked within assigned schedule times
+                    </div>
+                    {selectedEmployee.scheduleData && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        Schedule: {selectedEmployee.scheduleData.dailySchedule?.map((day: any) => 
+                          `${day.day.charAt(0).toUpperCase() + day.day.slice(1)} ${day.startTime}-${day.endTime}`
+                        ).join(', ') || 'No schedule set'}
+                      </div>
+                    )}
                     {selectedEmployee.overtimeHours > 0 && (
                       <div className="text-xs text-red-500 mt-1">
                         Note: {formatHoursMinutes(selectedEmployee.overtimeHours)} overtime hours are not included in pay calculation
@@ -3622,9 +3660,14 @@ const AdminDashboard: NextPage = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             <div className="font-semibold text-gray-900">{formatHoursMinutes(displayHours)}</div>
-                            {entry.actualHours > scheduledHours && (
-                              <div className="text-xs text-gray-500">
-                                (Actual: {formatHoursMinutes(entry.actualHours)})
+                            {entry.withinSchedule && (
+                              <div className="text-xs text-green-600">
+                                ✓ Within schedule
+                              </div>
+                            )}
+                            {!entry.withinSchedule && displayHours === 0 && (
+                              <div className="text-xs text-red-500">
+                                Outside schedule hours
                               </div>
                             )}
                           </td>
