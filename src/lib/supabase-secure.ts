@@ -413,6 +413,134 @@ export const timeTrackingService = {
     return { data, error };
   },
 
+  // Enhanced function to get time entries with break data for payslips
+  async getTimeEntriesWithBreaks(userId: string, startDate: string, endDate: string) {
+    // Get time entries
+    const { data: timeEntries, error: timeError } = await supabase
+      .from('time_entries')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('clock_in_time', startDate)
+      .lte('clock_in_time', endDate)
+      .order('clock_in_time', { ascending: true });
+
+    if (timeError) {
+      return { data: null, error: timeError };
+    }
+
+    if (!timeEntries || timeEntries.length === 0) {
+      return { data: [], error: null };
+    }
+
+    // Get all break entries for these time entries
+    const timeEntryIds = timeEntries.map(entry => entry.id);
+    const { data: breaks, error: breakError } = await supabase
+      .from('break_entries')
+      .select('*')
+      .in('time_entry_id', timeEntryIds)
+      .order('clock_in_time', { ascending: true });
+
+    if (breakError) {
+      console.warn('Failed to load break entries:', breakError);
+      // Still return time entries without breaks
+      return { data: timeEntries.map(entry => ({ ...entry, breaks: [] })), error: null };
+    }
+
+    // Group breaks by time entry
+    const breaksByTimeEntry = (breaks || []).reduce((acc, breakEntry) => {
+      if (!acc[breakEntry.time_entry_id]) {
+        acc[breakEntry.time_entry_id] = [];
+      }
+      acc[breakEntry.time_entry_id].push(breakEntry);
+      return acc;
+    }, {} as { [key: string]: any[] });
+
+    // Combine time entries with their breaks
+    const enrichedEntries = timeEntries.map(entry => {
+      const entryBreaks = breaksByTimeEntry[entry.id] || [];
+      
+      // Calculate total break time
+      const totalBreakMinutes = entryBreaks.reduce((total, breakEntry) => {
+        if (breakEntry.clock_in_time && breakEntry.clock_out_time) {
+          const breakStart = new Date(breakEntry.clock_in_time);
+          const breakEnd = new Date(breakEntry.clock_out_time);
+          const breakDuration = (breakEnd.getTime() - breakStart.getTime()) / (1000 * 60); // minutes
+          return total + breakDuration;
+        }
+        return total;
+      }, 0);
+
+      return {
+        ...entry,
+        breaks: entryBreaks,
+        totalBreakMinutes: Math.round(totalBreakMinutes),
+        totalBreakHours: Math.round((totalBreakMinutes / 60) * 100) / 100
+      };
+    });
+
+    return { data: enrichedEntries, error: null };
+  },
+
+  // Enhanced function to get employee schedule for comparison
+  async getEmployeeScheduleForPayroll(userId: string, startDate: string, endDate: string) {
+    const { data: schedule, error } = await supabase
+      .from('employee_schedules')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (error || !schedule || schedule.length === 0) {
+      return { data: null, error: error || 'No schedule found' };
+    }
+
+    // Parse the schedule and calculate expected hours for the date range
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const scheduleData = schedule[0];
+    
+    let totalScheduledHours = 0;
+    const dailySchedule = [];
+
+    // Iterate through each day in the range
+    for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
+      const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const dayKey = dayNames[dayOfWeek];
+      
+      const daySchedule = scheduleData[`${dayKey}_schedule`];
+      if (daySchedule && daySchedule.enabled) {
+        const startTime = daySchedule.start_time;
+        const endTime = daySchedule.end_time;
+        
+        if (startTime && endTime) {
+          // Calculate hours for this day
+          const [startHour, startMin] = startTime.split(':').map(Number);
+          const [endHour, endMin] = endTime.split(':').map(Number);
+          const startMinutes = startHour * 60 + startMin;
+          const endMinutes = endHour * 60 + endMin;
+          const dayHours = (endMinutes - startMinutes) / 60;
+          
+          totalScheduledHours += dayHours;
+          dailySchedule.push({
+            date: date.toISOString().split('T')[0],
+            day: dayKey,
+            startTime,
+            endTime,
+            scheduledHours: dayHours
+          });
+        }
+      }
+    }
+
+    return {
+      data: {
+        schedule: scheduleData,
+        totalScheduledHours: Math.round(totalScheduledHours * 100) / 100,
+        dailySchedule
+      },
+      error: null
+    };
+  },
+
   async getActiveStaff(branchId: string) {
     const { data, error } = await supabase
       .from('time_entries')

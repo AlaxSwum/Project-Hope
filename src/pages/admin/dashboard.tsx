@@ -509,46 +509,91 @@ const AdminDashboard: NextPage = () => {
         }
 
         const employeePromises = branchStaff.map(async (staff: any) => {
-          const { data: timeEntries, error: timeError } = await timeTrackingService.getTimeEntries(staff.user_id, startDate, endDate);
+          // Get time entries with break data
+          const { data: timeEntries, error: timeError } = await timeTrackingService.getTimeEntriesWithBreaks(staff.user_id, startDate, endDate);
+          
+          // Get employee schedule for comparison
+          const { data: scheduleData, error: scheduleError } = await timeTrackingService.getEmployeeScheduleForPayroll(staff.user_id, startDate, endDate);
+          
           if (timeError) {
             console.error(`Failed to load time entries for user ${staff.user_id}:`, timeError);
             return { 
               ...staff, 
-              // Extract user information properly
               first_name: staff.user?.first_name || 'Unknown',
               last_name: staff.user?.last_name || 'User',
               email: staff.user?.email || '',
               role: staff.user?.role || 'staff',
               timeEntries: [], 
               totalHours: 0, 
-              totalPay: 0 
+              totalPay: 0,
+              totalScheduledHours: 0,
+              totalActualHours: 0,
+              totalBreakHours: 0,
+              overtimeHours: 0
             };
           }
 
-          // Calculate total hours and pay using ONLY scheduled hours (no overtime)
-          const staffPayRate = staff.pay_rate || 12.00; // Use staff's pay rate from branch assignment
+          const staffPayRate = staff.pay_rate || 12.00;
+          let totalActualHours = 0;
+          let totalBreakHours = 0;
+          let totalScheduledHours = scheduleData?.totalScheduledHours || 0;
+
+          // Process each time entry with enhanced data
+          const processedEntries = (timeEntries || []).map((entry: any) => {
+            const clockIn = entry.clock_in_time ? new Date(entry.clock_in_time) : null;
+            const clockOut = entry.clock_out_time ? new Date(entry.clock_out_time) : null;
+            
+            // Calculate actual worked hours (minus breaks)
+            let actualHours = 0;
+            if (clockIn && clockOut) {
+              const totalMinutes = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60);
+              const workMinutes = totalMinutes - (entry.totalBreakMinutes || 0);
+              actualHours = Math.max(0, workMinutes / 60); // Ensure not negative
+            }
+
+            // Find scheduled hours for this specific day
+            const entryDate = clockIn ? clockIn.toISOString().split('T')[0] : '';
+            const daySchedule = scheduleData?.dailySchedule?.find((ds: any) => ds.date === entryDate);
+            const scheduledHoursForDay = daySchedule?.scheduledHours || 0;
+
+            totalActualHours += actualHours;
+            totalBreakHours += entry.totalBreakHours || 0;
+
+            return {
+              ...entry,
+              actualHours: Math.round(actualHours * 100) / 100,
+              scheduledHoursForDay: Math.round(scheduledHoursForDay * 100) / 100,
+              daySchedule: daySchedule
+            };
+          });
+
+          // Calculate overtime (hours worked beyond scheduled)
+          const overtimeHours = Math.max(0, totalActualHours - totalScheduledHours);
+          const regularHours = Math.min(totalActualHours, totalScheduledHours);
           
-          // Use schedule-based calculation to exclude overtime
-          const { totalHours: scheduledHours, entries: processedEntries } = await timeTrackingService.calculateScheduledHours(
-            staff.user_id, 
-            startDate, 
-            endDate
-          );
-          
-          const totalHours = scheduledHours;
-          const totalPay = totalHours * staffPayRate;
+          // Calculate pay (regular + overtime at 1.5x)
+          const regularPay = regularHours * staffPayRate;
+          const overtimePay = overtimeHours * staffPayRate * 1.5;
+          const totalPay = regularPay + overtimePay;
 
           return {
             ...staff,
-            // Extract user information properly
             first_name: staff.user?.first_name || 'Unknown',
             last_name: staff.user?.last_name || 'User',
             email: staff.user?.email || '',
             role: staff.user?.role || 'staff',
             position: staff.position || staff.user?.position || 'Staff',
-            timeEntries: processedEntries || timeEntries || [], // Use processed entries with scheduled hours
-            totalHours: Math.round(totalHours * 100) / 100,
-            totalPay: Math.round(totalPay * 100) / 100
+            timeEntries: processedEntries,
+            totalHours: Math.round(totalActualHours * 100) / 100,
+            totalScheduledHours: Math.round(totalScheduledHours * 100) / 100,
+            totalActualHours: Math.round(totalActualHours * 100) / 100,
+            totalBreakHours: Math.round(totalBreakHours * 100) / 100,
+            overtimeHours: Math.round(overtimeHours * 100) / 100,
+            regularHours: Math.round(regularHours * 100) / 100,
+            totalPay: Math.round(totalPay * 100) / 100,
+            regularPay: Math.round(regularPay * 100) / 100,
+            overtimePay: Math.round(overtimePay * 100) / 100,
+            scheduleData: scheduleData
           };
         });
 
@@ -2361,7 +2406,9 @@ const AdminDashboard: NextPage = () => {
                                 <tr>
                                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
                                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Position</th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Hours</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Scheduled</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actual</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Overtime</th>
                                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Pay</th>
                                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                 </tr>
@@ -2390,10 +2437,30 @@ const AdminDashboard: NextPage = () => {
                                       </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                      <div className="text-sm font-semibold text-gray-900">{employee.totalHours}h</div>
+                                      <div className="text-sm font-semibold text-blue-600">{employee.totalScheduledHours || 0}h</div>
+                                      <div className="text-xs text-gray-500">Scheduled</div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <div className="text-sm font-semibold text-gray-900">{employee.totalActualHours || 0}h</div>
+                                      {employee.totalBreakHours > 0 && (
+                                        <div className="text-xs text-gray-500">(-{employee.totalBreakHours}h breaks)</div>
+                                      )}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      {employee.overtimeHours > 0 ? (
+                                        <div className="text-sm font-semibold text-orange-600">{employee.overtimeHours}h</div>
+                                      ) : (
+                                        <div className="text-sm text-gray-400">0h</div>
+                                      )}
+                                      {employee.overtimeHours > 0 && (
+                                        <div className="text-xs text-orange-500">1.5x rate</div>
+                                      )}
                                     </td>
                                      <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="text-sm font-semibold text-green-600">£{employee.totalPay.toFixed(2)}</div>
+                                        {employee.overtimePay > 0 && (
+                                          <div className="text-xs text-gray-500">+£{employee.overtimePay.toFixed(2)} OT</div>
+                                        )}
                                      </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                       <button
@@ -3349,10 +3416,22 @@ const AdminDashboard: NextPage = () => {
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                   <div>
-                    <p className="text-sm font-medium text-gray-500">Total Hours</p>
-                    <p className="text-2xl font-bold text-gray-900">{selectedEmployee.totalHours}h</p>
+                    <p className="text-sm font-medium text-gray-500">Scheduled Hours</p>
+                    <p className="text-2xl font-bold text-blue-600">{selectedEmployee.totalScheduledHours || 0}h</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Actual Hours</p>
+                    <p className="text-2xl font-bold text-gray-900">{selectedEmployee.totalActualHours || 0}h</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Break Time</p>
+                    <p className="text-2xl font-bold text-orange-600">{selectedEmployee.totalBreakHours || 0}h</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Overtime</p>
+                    <p className="text-2xl font-bold text-red-600">{selectedEmployee.overtimeHours || 0}h</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-500">Hourly Rate</p>
@@ -3362,11 +3441,28 @@ const AdminDashboard: NextPage = () => {
                     <p className="text-sm font-medium text-gray-500">Total Pay</p>
                     <p className="text-2xl font-bold text-green-600">£{selectedEmployee.totalPay.toFixed(2)}</p>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Working Days</p>
-                    <p className="text-2xl font-bold text-gray-900">{selectedEmployee.timeEntries?.length || 0}</p>
-                  </div>
                 </div>
+                
+                {/* Pay Breakdown */}
+                {selectedEmployee.overtimePay > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Pay Breakdown</h4>
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-500">Regular Pay:</span>
+                        <span className="ml-2 font-semibold">£{(selectedEmployee.regularPay || 0).toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Overtime Pay:</span>
+                        <span className="ml-2 font-semibold text-orange-600">£{(selectedEmployee.overtimePay || 0).toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Total:</span>
+                        <span className="ml-2 font-bold text-green-600">£{selectedEmployee.totalPay.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="overflow-x-auto">
@@ -3376,9 +3472,10 @@ const AdminDashboard: NextPage = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clock In</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clock Out</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Breaks</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Scheduled</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actual</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Holiday</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pay Rate</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                     </tr>
                   </thead>
@@ -3386,13 +3483,12 @@ const AdminDashboard: NextPage = () => {
                     {selectedEmployee.timeEntries?.map((entry: any, index: number) => {
                       const clockIn = entry.clock_in_time ? new Date(entry.clock_in_time) : null;
                       const clockOut = entry.clock_out_time ? new Date(entry.clock_out_time) : null;
-                      // Use scheduled hours if available, otherwise calculate raw hours
-                      const hours = entry.scheduledHours !== undefined ? 
-                        entry.scheduledHours : 
-                        (clockIn && clockOut ? Math.round(((clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60)) * 100) / 100 : 0);
-                      // Use the employee's pay rate from branch assignment instead of time entry
                       const payRate = selectedEmployee.pay_rate || 12.00;
-                      const amount = hours * payRate;
+                      const actualHours = entry.actualHours || 0;
+                      const scheduledHours = entry.scheduledHoursForDay || 0;
+                      const overtimeForDay = Math.max(0, actualHours - scheduledHours);
+                      const regularHoursForDay = Math.min(actualHours, scheduledHours);
+                      const amount = (regularHoursForDay * payRate) + (overtimeForDay * payRate * 1.5);
 
                       return (
                         <tr key={index} className="hover:bg-gray-50">
@@ -3414,8 +3510,48 @@ const AdminDashboard: NextPage = () => {
                               </div>
                             ) : 'Not clocked out'}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                            {hours}h
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {entry.breaks && entry.breaks.length > 0 ? (
+                              <div className="space-y-1">
+                                {entry.breaks.map((breakEntry: any, breakIndex: number) => {
+                                  const breakStart = breakEntry.clock_in_time ? new Date(breakEntry.clock_in_time) : null;
+                                  const breakEnd = breakEntry.clock_out_time ? new Date(breakEntry.clock_out_time) : null;
+                                  const breakDuration = breakStart && breakEnd ? 
+                                    Math.round((breakEnd.getTime() - breakStart.getTime()) / (1000 * 60)) : 0;
+                                  
+                                  return (
+                                    <div key={breakIndex} className="text-xs">
+                                      <span className="text-gray-600">
+                                        {breakStart?.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - 
+                                        {breakEnd ? breakEnd.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'ongoing'}
+                                      </span>
+                                      {breakDuration > 0 && (
+                                        <span className="ml-1 text-orange-600 font-medium">({breakDuration}m)</span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                                <div className="text-xs font-medium text-orange-600 mt-1">
+                                  Total: {entry.totalBreakMinutes || 0}m
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 text-xs">No breaks</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <div className="text-blue-600 font-semibold">{scheduledHours}h</div>
+                            {entry.daySchedule && (
+                              <div className="text-xs text-gray-500">
+                                {entry.daySchedule.startTime} - {entry.daySchedule.endTime}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <div className="font-semibold text-gray-900">{actualHours}h</div>
+                            {overtimeForDay > 0 && (
+                              <div className="text-xs text-orange-600">+{overtimeForDay}h OT</div>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             {entry.holidayInfo ? (
@@ -3439,18 +3575,13 @@ const AdminDashboard: NextPage = () => {
                               <span className="text-gray-400 text-xs">Regular day</span>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                             <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                               £{payRate.toFixed(2)}/hr
-                               {entry.holidayInfo?.payMultiplier && (
-                                 <span className="ml-1 text-orange-600">
-                                   ({entry.holidayInfo.payMultiplier}x)
-                                 </span>
-                               )}
-                             </span>
-                           </td>
                            <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                             £{amount.toFixed(2)}
+                             <div>£{amount.toFixed(2)}</div>
+                             {overtimeForDay > 0 && (
+                               <div className="text-xs text-orange-600">
+                                 £{(regularHoursForDay * payRate).toFixed(2)} + £{(overtimeForDay * payRate * 1.5).toFixed(2)} OT
+                               </div>
+                             )}
                            </td>
                         </tr>
                       );
