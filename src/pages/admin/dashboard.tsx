@@ -671,7 +671,8 @@ const AdminDashboard: NextPage = () => {
           const totalPay = totalPayableHours * staffPayRate;
           
           // Keep track of actual overtime for informational purposes only
-          const overtimeHours = Math.max(0, totalActualHours - totalScheduledHours);
+          // Only calculate overtime if there's a schedule set
+          const overtimeHours = totalScheduledHours > 0 ? Math.max(0, totalActualHours - totalScheduledHours) : 0;
 
           return {
             ...staff,
@@ -2542,12 +2543,21 @@ const AdminDashboard: NextPage = () => {
                                       )}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                      {employee.overtimeHours > 0 ? (
-                                        <div className="text-sm font-semibold text-orange-600">{formatHoursMinutes(employee.overtimeHours)}</div>
+                                      {employee.totalScheduledHours > 0 ? (
+                                        <>
+                                          {employee.overtimeHours > 0 ? (
+                                            <div className="text-sm font-semibold text-orange-600">{formatHoursMinutes(employee.overtimeHours)}</div>
+                                          ) : (
+                                            <div className="text-sm text-gray-400">0h</div>
+                                          )}
+                                          <div className="text-xs text-gray-500">Not paid</div>
+                                        </>
                                       ) : (
-                                        <div className="text-sm text-gray-400">0h</div>
+                                        <>
+                                          <div className="text-sm text-gray-400">N/A</div>
+                                          <div className="text-xs text-gray-500">No schedule</div>
+                                        </>
                                       )}
-                                      <div className="text-xs text-gray-500">Not paid</div>
                                     </td>
                                      <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="text-sm font-semibold text-green-600">£{employee.totalPay.toFixed(2)}</div>
@@ -3529,8 +3539,17 @@ const AdminDashboard: NextPage = () => {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-500">Overtime</p>
-                    <p className="text-2xl font-bold text-red-600">{formatHoursMinutes(selectedEmployee.overtimeHours || 0)}</p>
-                    <p className="text-xs text-red-500">Not paid</p>
+                    {selectedEmployee.totalScheduledHours > 0 ? (
+                      <>
+                        <p className="text-2xl font-bold text-red-600">{formatHoursMinutes(selectedEmployee.overtimeHours || 0)}</p>
+                        <p className="text-xs text-red-500">Not paid</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-2xl font-bold text-gray-400">N/A</p>
+                        <p className="text-xs text-gray-500">No schedule set</p>
+                      </>
+                    )}
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-500">Hourly Rate</p>
@@ -3559,7 +3578,7 @@ const AdminDashboard: NextPage = () => {
                         ).join(', ') || 'No schedule set'}
                       </div>
                     )}
-                    {selectedEmployee.overtimeHours > 0 && (
+                    {selectedEmployee.overtimeHours > 0 && selectedEmployee.totalScheduledHours > 0 && (
                       <div className="text-xs text-red-500 mt-1">
                         Note: {formatHoursMinutes(selectedEmployee.overtimeHours)} overtime hours are not included in pay calculation
                       </div>
