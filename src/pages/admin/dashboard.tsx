@@ -19,12 +19,26 @@ import { toast } from 'react-toastify';
 
 // Helper function to format hours and minutes
 const formatHoursMinutes = (totalHours: number): string => {
-  const hours = Math.floor(totalHours);
-  const minutes = Math.round((totalHours - hours) * 60);
+  if (totalHours === 0) return '0h';
   
-  if (hours === 0 && minutes === 0) return '0h';
-  if (minutes === 0) return `${hours}h`;
-  if (hours === 0) return `${minutes}m`;
+  const hours = Math.floor(totalHours);
+  const remainingMinutes = (totalHours - hours) * 60;
+  const minutes = Math.floor(remainingMinutes);
+  const seconds = Math.round((remainingMinutes - minutes) * 60);
+  
+  // For very small durations, show seconds too
+  if (hours === 0 && minutes === 0 && seconds > 0) {
+    return `${seconds}s`;
+  }
+  
+  if (hours === 0 && minutes > 0) {
+    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  }
+  
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+  
   return `${hours}h ${minutes}m`;
 };
 
@@ -599,7 +613,8 @@ const AdminDashboard: NextPage = () => {
             const scheduledHoursForDay = daySchedule?.scheduledHours || 0;
 
             // Only include hours up to scheduled hours (no overtime display)
-            const displayHours = Math.min(actualHours, scheduledHoursForDay);
+            // But always pay for actual time worked, even if less than scheduled
+            const displayHours = scheduledHoursForDay > 0 ? Math.min(actualHours, scheduledHoursForDay) : actualHours;
 
             totalActualHours += actualHours;
             totalBreakHours += totalBreakMinutes / 60;
@@ -622,8 +637,9 @@ const AdminDashboard: NextPage = () => {
             };
           });
 
-          // Calculate pay based on scheduled hours only (no overtime for payslips)
-          const payableHours = Math.min(totalActualHours, totalScheduledHours);
+          // Calculate pay based on actual hours worked, capped at scheduled hours if schedule exists
+          // If no schedule exists, pay for all actual hours worked
+          const payableHours = totalScheduledHours > 0 ? Math.min(totalActualHours, totalScheduledHours) : totalActualHours;
           const totalPay = payableHours * staffPayRate;
           
           // Keep track of actual overtime for informational purposes only
@@ -2509,6 +2525,11 @@ const AdminDashboard: NextPage = () => {
                                         <div className="text-sm font-semibold text-green-600">£{employee.totalPay.toFixed(2)}</div>
                                         <div className="text-xs text-gray-500">
                                           £{(employee.pay_rate || 12.00).toFixed(2)}/hr × {formatHoursMinutes(employee.totalHours || 0)}
+                                          {employee.totalHours > 0 && employee.totalHours < 0.1 && (
+                                            <div className="text-blue-600">
+                                              (£{((employee.pay_rate || 12.00) / 60).toFixed(4)}/min)
+                                            </div>
+                                          )}
                                         </div>
                                      </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -3633,6 +3654,11 @@ const AdminDashboard: NextPage = () => {
                              <div>£{amount.toFixed(2)}</div>
                              <div className="text-xs text-gray-500">
                                £{payRate.toFixed(2)}/hr × {formatHoursMinutes(displayHours)}
+                               {displayHours > 0 && displayHours < 0.1 && (
+                                 <div className="text-xs text-blue-600">
+                                   (£{(payRate / 60).toFixed(4)}/min × {Math.round(displayHours * 60)}min)
+                                 </div>
+                               )}
                              </div>
                            </td>
                         </tr>
