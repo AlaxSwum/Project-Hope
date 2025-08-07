@@ -66,7 +66,7 @@ export const branchService = {
       const branchesWithStaffCount = await Promise.all(
         (branches || []).map(async (branch) => {
           const { count } = await supabaseAdmin
-            .from('user_branch_assignments')
+            .from('branch_staff_assignments')
             .select('*', { count: 'exact', head: true })
             .eq('branch_id', branch.id)
             .eq('is_active', true);
