@@ -17,6 +17,17 @@ import { PasswordDetailsModal } from '../../components/PasswordDetailsModal';
 import { PasswordShareModal } from '../../components/PasswordShareModal';
 import { toast } from 'react-toastify';
 
+// Helper function to format hours and minutes
+const formatHoursMinutes = (totalHours: number): string => {
+  const hours = Math.floor(totalHours);
+  const minutes = Math.round((totalHours - hours) * 60);
+  
+  if (hours === 0 && minutes === 0) return '0h';
+  if (minutes === 0) return `${hours}h`;
+  if (hours === 0) return `${minutes}m`;
+  return `${hours}h ${minutes}m`;
+};
+
 const AdminDashboard: NextPage = () => {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -538,43 +549,85 @@ const AdminDashboard: NextPage = () => {
           let totalBreakHours = 0;
           let totalScheduledHours = scheduleData?.totalScheduledHours || 0;
 
-          // Process each time entry with enhanced data
-          const processedEntries = (timeEntries || []).map((entry: any) => {
+          // Group entries by date and combine same-day entries
+          const entriesByDate = (timeEntries || []).reduce((acc: any, entry: any) => {
             const clockIn = entry.clock_in_time ? new Date(entry.clock_in_time) : null;
-            const clockOut = entry.clock_out_time ? new Date(entry.clock_out_time) : null;
+            const entryDate = clockIn ? clockIn.toISOString().split('T')[0] : '';
             
-            // Calculate actual worked hours (minus breaks)
+            if (!acc[entryDate]) {
+              acc[entryDate] = [];
+            }
+            acc[entryDate].push(entry);
+            return acc;
+          }, {});
+
+          // Process combined daily entries
+          const processedEntries = Object.entries(entriesByDate).map(([date, dayEntries]: [string, any]) => {
+            const sortedEntries = dayEntries.sort((a: any, b: any) => 
+              new Date(a.clock_in_time).getTime() - new Date(b.clock_in_time).getTime()
+            );
+
+            // Get first clock in and last clock out of the day
+            const firstEntry = sortedEntries[0];
+            const lastEntry = sortedEntries[sortedEntries.length - 1];
+            
+            const clockIn = firstEntry.clock_in_time ? new Date(firstEntry.clock_in_time) : null;
+            const clockOut = lastEntry.clock_out_time ? new Date(lastEntry.clock_out_time) : null;
+
+            // Combine all breaks from the day
+            const allBreaks = sortedEntries.flatMap((entry: any) => entry.breaks || []);
+            const totalBreakMinutes = allBreaks.reduce((total: number, breakEntry: any) => {
+              if (breakEntry.clock_in_time && breakEntry.clock_out_time) {
+                const breakStart = new Date(breakEntry.clock_in_time);
+                const breakEnd = new Date(breakEntry.clock_out_time);
+                const breakDuration = (breakEnd.getTime() - breakStart.getTime()) / (1000 * 60);
+                return total + breakDuration;
+              }
+              return total;
+            }, 0);
+
+            // Calculate actual worked hours (total time minus breaks)
             let actualHours = 0;
             if (clockIn && clockOut) {
               const totalMinutes = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60);
-              const workMinutes = totalMinutes - (entry.totalBreakMinutes || 0);
-              actualHours = Math.max(0, workMinutes / 60); // Ensure not negative
+              const workMinutes = totalMinutes - totalBreakMinutes;
+              actualHours = Math.max(0, workMinutes / 60);
             }
 
-            // Find scheduled hours for this specific day
-            const entryDate = clockIn ? clockIn.toISOString().split('T')[0] : '';
-            const daySchedule = scheduleData?.dailySchedule?.find((ds: any) => ds.date === entryDate);
+            // Find scheduled hours for this day
+            const daySchedule = scheduleData?.dailySchedule?.find((ds: any) => ds.date === date);
             const scheduledHoursForDay = daySchedule?.scheduledHours || 0;
 
+            // Only include hours up to scheduled hours (no overtime display)
+            const displayHours = Math.min(actualHours, scheduledHoursForDay);
+
             totalActualHours += actualHours;
-            totalBreakHours += entry.totalBreakHours || 0;
+            totalBreakHours += totalBreakMinutes / 60;
 
             return {
-              ...entry,
+              id: `combined-${date}`,
+              clock_in_time: firstEntry.clock_in_time,
+              clock_out_time: lastEntry.clock_out_time,
+              breaks: allBreaks,
+              totalBreakMinutes: Math.round(totalBreakMinutes),
+              totalBreakHours: Math.round((totalBreakMinutes / 60) * 100) / 100,
               actualHours: Math.round(actualHours * 100) / 100,
+              displayHours: Math.round(displayHours * 100) / 100, // Hours to display (capped at scheduled)
               scheduledHoursForDay: Math.round(scheduledHoursForDay * 100) / 100,
-              daySchedule: daySchedule
+              daySchedule: daySchedule,
+              holidayInfo: firstEntry.holidayInfo, // Use first entry's holiday info
+              autoClockOut: lastEntry.autoClockOut,
+              date: date,
+              combinedEntries: sortedEntries.length
             };
           });
 
-          // Calculate overtime (hours worked beyond scheduled)
-          const overtimeHours = Math.max(0, totalActualHours - totalScheduledHours);
-          const regularHours = Math.min(totalActualHours, totalScheduledHours);
+          // Calculate pay based on scheduled hours only (no overtime for payslips)
+          const payableHours = Math.min(totalActualHours, totalScheduledHours);
+          const totalPay = payableHours * staffPayRate;
           
-          // Calculate pay (regular + overtime at 1.5x)
-          const regularPay = regularHours * staffPayRate;
-          const overtimePay = overtimeHours * staffPayRate * 1.5;
-          const totalPay = regularPay + overtimePay;
+          // Keep track of actual overtime for informational purposes only
+          const overtimeHours = Math.max(0, totalActualHours - totalScheduledHours);
 
           return {
             ...staff,
@@ -584,15 +637,13 @@ const AdminDashboard: NextPage = () => {
             role: staff.user?.role || 'staff',
             position: staff.position || staff.user?.position || 'Staff',
             timeEntries: processedEntries,
-            totalHours: Math.round(totalActualHours * 100) / 100,
+            totalHours: Math.round(payableHours * 100) / 100, // Show payable hours in summary
             totalScheduledHours: Math.round(totalScheduledHours * 100) / 100,
             totalActualHours: Math.round(totalActualHours * 100) / 100,
             totalBreakHours: Math.round(totalBreakHours * 100) / 100,
             overtimeHours: Math.round(overtimeHours * 100) / 100,
-            regularHours: Math.round(regularHours * 100) / 100,
+            payableHours: Math.round(payableHours * 100) / 100,
             totalPay: Math.round(totalPay * 100) / 100,
-            regularPay: Math.round(regularPay * 100) / 100,
-            overtimePay: Math.round(overtimePay * 100) / 100,
             scheduleData: scheduleData
           };
         });
@@ -2437,30 +2488,28 @@ const AdminDashboard: NextPage = () => {
                                       </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                      <div className="text-sm font-semibold text-blue-600">{employee.totalScheduledHours || 0}h</div>
+                                      <div className="text-sm font-semibold text-blue-600">{formatHoursMinutes(employee.totalScheduledHours || 0)}</div>
                                       <div className="text-xs text-gray-500">Scheduled</div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                      <div className="text-sm font-semibold text-gray-900">{employee.totalActualHours || 0}h</div>
+                                      <div className="text-sm font-semibold text-gray-900">{formatHoursMinutes(employee.totalHours || 0)}</div>
                                       {employee.totalBreakHours > 0 && (
-                                        <div className="text-xs text-gray-500">(-{employee.totalBreakHours}h breaks)</div>
+                                        <div className="text-xs text-gray-500">(-{formatHoursMinutes(employee.totalBreakHours)} breaks)</div>
                                       )}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                       {employee.overtimeHours > 0 ? (
-                                        <div className="text-sm font-semibold text-orange-600">{employee.overtimeHours}h</div>
+                                        <div className="text-sm font-semibold text-orange-600">{formatHoursMinutes(employee.overtimeHours)}</div>
                                       ) : (
                                         <div className="text-sm text-gray-400">0h</div>
                                       )}
-                                      {employee.overtimeHours > 0 && (
-                                        <div className="text-xs text-orange-500">1.5x rate</div>
-                                      )}
+                                      <div className="text-xs text-gray-500">Not paid</div>
                                     </td>
                                      <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="text-sm font-semibold text-green-600">£{employee.totalPay.toFixed(2)}</div>
-                                        {employee.overtimePay > 0 && (
-                                          <div className="text-xs text-gray-500">+£{employee.overtimePay.toFixed(2)} OT</div>
-                                        )}
+                                        <div className="text-xs text-gray-500">
+                                          £{(employee.pay_rate || 12.00).toFixed(2)}/hr × {formatHoursMinutes(employee.totalHours || 0)}
+                                        </div>
                                      </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                       <button
@@ -3416,22 +3465,23 @@ const AdminDashboard: NextPage = () => {
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                   <div>
                     <p className="text-sm font-medium text-gray-500">Scheduled Hours</p>
-                    <p className="text-2xl font-bold text-blue-600">{selectedEmployee.totalScheduledHours || 0}h</p>
+                    <p className="text-2xl font-bold text-blue-600">{formatHoursMinutes(selectedEmployee.totalScheduledHours || 0)}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-500">Actual Hours</p>
-                    <p className="text-2xl font-bold text-gray-900">{selectedEmployee.totalActualHours || 0}h</p>
+                    <p className="text-sm font-medium text-gray-500">Paid Hours</p>
+                    <p className="text-2xl font-bold text-gray-900">{formatHoursMinutes(selectedEmployee.totalHours || 0)}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-500">Break Time</p>
-                    <p className="text-2xl font-bold text-orange-600">{selectedEmployee.totalBreakHours || 0}h</p>
+                    <p className="text-2xl font-bold text-orange-600">{formatHoursMinutes(selectedEmployee.totalBreakHours || 0)}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-500">Overtime</p>
-                    <p className="text-2xl font-bold text-red-600">{selectedEmployee.overtimeHours || 0}h</p>
+                    <p className="text-2xl font-bold text-red-600">{formatHoursMinutes(selectedEmployee.overtimeHours || 0)}</p>
+                    <p className="text-xs text-red-500">Not paid</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-500">Hourly Rate</p>
@@ -3443,26 +3493,20 @@ const AdminDashboard: NextPage = () => {
                   </div>
                 </div>
                 
-                {/* Pay Breakdown */}
-                {selectedEmployee.overtimePay > 0 && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">Pay Breakdown</h4>
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <span className="text-gray-500">Regular Pay:</span>
-                        <span className="ml-2 font-semibold">£{(selectedEmployee.regularPay || 0).toFixed(2)}</span>
+                {/* Pay Calculation Info */}
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Pay Calculation</h4>
+                  <div className="text-sm text-gray-600">
+                    <span className="font-medium">£{(selectedEmployee.pay_rate || 12.00).toFixed(2)}/hour</span> × 
+                    <span className="font-medium ml-1">{formatHoursMinutes(selectedEmployee.totalHours || 0)}</span> = 
+                    <span className="font-bold text-green-600 ml-1">£{selectedEmployee.totalPay.toFixed(2)}</span>
+                    {selectedEmployee.overtimeHours > 0 && (
+                      <div className="text-xs text-red-500 mt-1">
+                        Note: {formatHoursMinutes(selectedEmployee.overtimeHours)} overtime hours are not included in pay calculation
                       </div>
-                      <div>
-                        <span className="text-gray-500">Overtime Pay:</span>
-                        <span className="ml-2 font-semibold text-orange-600">£{(selectedEmployee.overtimePay || 0).toFixed(2)}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Total:</span>
-                        <span className="ml-2 font-bold text-green-600">£{selectedEmployee.totalPay.toFixed(2)}</span>
-                      </div>
-                    </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
 
               <div className="overflow-x-auto">
@@ -3484,16 +3528,19 @@ const AdminDashboard: NextPage = () => {
                       const clockIn = entry.clock_in_time ? new Date(entry.clock_in_time) : null;
                       const clockOut = entry.clock_out_time ? new Date(entry.clock_out_time) : null;
                       const payRate = selectedEmployee.pay_rate || 12.00;
-                      const actualHours = entry.actualHours || 0;
+                      const displayHours = entry.displayHours || 0; // Use display hours (capped at scheduled)
                       const scheduledHours = entry.scheduledHoursForDay || 0;
-                      const overtimeForDay = Math.max(0, actualHours - scheduledHours);
-                      const regularHoursForDay = Math.min(actualHours, scheduledHours);
-                      const amount = (regularHoursForDay * payRate) + (overtimeForDay * payRate * 1.5);
+                      const amount = displayHours * payRate; // No overtime in display
 
                       return (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {clockIn ? clockIn.toLocaleDateString() : 'N/A'}
+                            {entry.combinedEntries > 1 && (
+                              <div className="text-xs text-blue-600">
+                                ({entry.combinedEntries} sessions)
+                              </div>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {clockIn ? clockIn.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A'}
@@ -3513,7 +3560,7 @@ const AdminDashboard: NextPage = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             {entry.breaks && entry.breaks.length > 0 ? (
                               <div className="space-y-1">
-                                {entry.breaks.map((breakEntry: any, breakIndex: number) => {
+                                {entry.breaks.slice(0, 3).map((breakEntry: any, breakIndex: number) => {
                                   const breakStart = breakEntry.clock_in_time ? new Date(breakEntry.clock_in_time) : null;
                                   const breakEnd = breakEntry.clock_out_time ? new Date(breakEntry.clock_out_time) : null;
                                   const breakDuration = breakStart && breakEnd ? 
@@ -3531,8 +3578,13 @@ const AdminDashboard: NextPage = () => {
                                     </div>
                                   );
                                 })}
+                                {entry.breaks.length > 3 && (
+                                  <div className="text-xs text-gray-500">
+                                    +{entry.breaks.length - 3} more breaks
+                                  </div>
+                                )}
                                 <div className="text-xs font-medium text-orange-600 mt-1">
-                                  Total: {entry.totalBreakMinutes || 0}m
+                                  Total: {formatHoursMinutes(entry.totalBreakHours || 0)}
                                 </div>
                               </div>
                             ) : (
@@ -3540,7 +3592,7 @@ const AdminDashboard: NextPage = () => {
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <div className="text-blue-600 font-semibold">{scheduledHours}h</div>
+                            <div className="text-blue-600 font-semibold">{formatHoursMinutes(scheduledHours)}</div>
                             {entry.daySchedule && (
                               <div className="text-xs text-gray-500">
                                 {entry.daySchedule.startTime} - {entry.daySchedule.endTime}
@@ -3548,9 +3600,11 @@ const AdminDashboard: NextPage = () => {
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <div className="font-semibold text-gray-900">{actualHours}h</div>
-                            {overtimeForDay > 0 && (
-                              <div className="text-xs text-orange-600">+{overtimeForDay}h OT</div>
+                            <div className="font-semibold text-gray-900">{formatHoursMinutes(displayHours)}</div>
+                            {entry.actualHours > scheduledHours && (
+                              <div className="text-xs text-gray-500">
+                                (Actual: {formatHoursMinutes(entry.actualHours)})
+                              </div>
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -3577,11 +3631,9 @@ const AdminDashboard: NextPage = () => {
                           </td>
                            <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
                              <div>£{amount.toFixed(2)}</div>
-                             {overtimeForDay > 0 && (
-                               <div className="text-xs text-orange-600">
-                                 £{(regularHoursForDay * payRate).toFixed(2)} + £{(overtimeForDay * payRate * 1.5).toFixed(2)} OT
-                               </div>
-                             )}
+                             <div className="text-xs text-gray-500">
+                               £{payRate.toFixed(2)}/hr × {formatHoursMinutes(displayHours)}
+                             </div>
                            </td>
                         </tr>
                       );
