@@ -756,13 +756,72 @@ export const checklistService = {
 
   async getDailyStatus(userId: string) {
     const today = new Date().toISOString().split('T')[0];
-    const { data, error } = await supabase
-      .from('user_checklist_progress')
+    // Fetch daily status rows for this user and date
+    const { data: statuses, error } = await supabase
+      .from('user_daily_checklist_status')
       .select('*')
       .eq('user_id', userId)
-      .gte('completed_at', today)
-      .lt('completed_at', today + 'T23:59:59');
-    return { data, error };
+      .eq('date_for', today);
+
+    if (error) return { data: null, error };
+
+    if (!statuses || statuses.length === 0) return { data: [], error: null };
+
+    // Enrich each row with merged task list so totals reflect all items
+    const enriched = await Promise.all(
+      statuses.map(async (s: any) => {
+        const [tasksRes, allItemsRes] = await Promise.all([
+          supabase
+            .from('user_checklist_progress')
+            .select('*, checklist_items(*)')
+            .eq('user_id', userId)
+            .eq('checklist_id', s.checklist_id)
+            .eq('date_for', today),
+          supabase
+            .from('checklist_items')
+            .select('*')
+            .eq('checklist_id', s.checklist_id)
+            .order('sort_order')
+        ]);
+
+        const tasks = tasksRes.data || [];
+        const allItems = allItemsRes.data || [];
+
+        const progressByItemId: Record<string, any> = {} as any;
+        for (const t of tasks) progressByItemId[t.checklist_item_id] = t;
+
+        const mergedTasks = allItems.map((item: any) =>
+          progressByItemId[item.id] || {
+            id: `missing-${item.id}`,
+            user_id: userId,
+            checklist_id: s.checklist_id,
+            checklist_item_id: item.id,
+            completed: false,
+            completed_at: null,
+            is_required: item.is_required,
+            checklist_items: item,
+            date_for: today,
+          }
+        );
+
+        const totalItems = mergedTasks.length;
+        const completedItems = mergedTasks.filter((t: any) => !!t.completed).length;
+        const completionPercentage = totalItems > 0 ? (completedItems * 100) / totalItems : 0;
+        const isFullyCompleted = totalItems > 0 && completedItems === totalItems;
+
+        return {
+          ...s,
+          tasks: mergedTasks,
+          total_items: totalItems,
+          completed_items: completedItems,
+          completion_percentage: completionPercentage,
+          is_fully_completed: isFullyCompleted,
+          completed_at: isFullyCompleted ? s.completed_at : null,
+        };
+      })
+    );
+
+    return { data: enriched, error: null };
   },
 
   async getChecklistItems(checklistId: string) {
