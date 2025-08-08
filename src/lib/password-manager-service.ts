@@ -521,14 +521,32 @@ export const passwordManagerService = {
           .order('field_order')
           .order('field_name');
 
+        // De-duplicate any accidental duplicates that may exist in DB
+        const uniqueBy = <T>(items: T[], keyFn: (t: T) => string): T[] => {
+          const seen = new Set<string>();
+          const result: T[] = [];
+          for (const it of items || []) {
+            const k = keyFn(it);
+            if (!seen.has(k)) {
+              seen.add(k);
+              result.push(it);
+            }
+          }
+          return result;
+        };
+
+        const uniquePhones = uniqueBy(phoneData || [], (p: any) => `${p.phone_label}|${p.phone_number}`);
+        const uniqueEmails = uniqueBy(emailData || [], (e: any) => `${e.email_label}|${e.email_address}`);
+        const uniqueFields = uniqueBy(customFieldData || [], (f: any) => `${f.field_name}|${f.field_value}`);
+
         // Combine the data
         data = {
           ...entryData,
           folder_name: entryData.password_folders?.name,
           folder_color: entryData.password_folders?.color,
-          phone_numbers: phoneData || [],
-          email_addresses: emailData || [],
-          custom_fields: customFieldData || []
+          phone_numbers: uniquePhones,
+          email_addresses: uniqueEmails,
+          custom_fields: uniqueFields
         };
         error = null;
       }
@@ -724,7 +742,10 @@ export const passwordManagerService = {
           .select('*')
           .eq('password_entry_id', entryId);
 
-        const currentPhones = enhancedData.phone_numbers || [];
+        // Deduplicate client payload to avoid inserting duplicates
+        const currentPhones = (enhancedData.phone_numbers || []).filter((p, idx, arr) =>
+          arr.findIndex(x => x.phone_number === p.phone_number && x.phone_label === p.phone_label) === idx
+        );
         const existingPhoneIds = (existingPhones || []).map((p: any) => p.id);
         const currentPhoneIds = currentPhones.filter(p => p.id).map(p => p.id);
 
@@ -769,7 +790,9 @@ export const passwordManagerService = {
           .select('*')
           .eq('password_entry_id', entryId);
 
-        const currentEmails = enhancedData.email_addresses || [];
+        const currentEmails = (enhancedData.email_addresses || []).filter((e, idx, arr) =>
+          arr.findIndex(x => x.email_address === e.email_address && x.email_label === e.email_label) === idx
+        );
         const existingEmailIds = (existingEmails || []).map((e: any) => e.id);
         const currentEmailIds = currentEmails.filter(e => e.id).map(e => e.id);
 
@@ -800,7 +823,9 @@ export const passwordManagerService = {
           .select('*')
           .eq('password_entry_id', entryId);
 
-        const currentFields = enhancedData.custom_fields || [];
+        const currentFields = (enhancedData.custom_fields || []).filter((f, idx, arr) =>
+          arr.findIndex(x => x.field_name === f.field_name && x.field_value === f.field_value) === idx
+        );
         const existingFieldIds = (existingFields || []).map((f: any) => f.id);
         const currentFieldIds = currentFields.filter(f => f.id).map(f => f.id);
 
