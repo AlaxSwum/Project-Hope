@@ -143,7 +143,9 @@ const AdminDashboard: NextPage = () => {
       branches.forEach(branch => loadBranchStaffCounts(branch.id));
     }
     if (activeSection === 'monitoring') {
+      // Ensure both progress data and branch list are loaded for monitoring screen
       loadAllUsersProgress();
+      loadBranches();
     }
     if (activeSection === 'payslips') {
       loadPayslipData();
