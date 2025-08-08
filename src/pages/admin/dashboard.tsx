@@ -3916,6 +3916,7 @@ const CreateUserModal = ({ onClose, onUserCreated }: { onClose: () => void, onUs
                 <option value="staff">Staff</option>
                 <option value="pharmacist">Pharmacist</option>
                 <option value="c-level">C-Level</option>
+                <option value="administrator">Administrator</option>
               </select>
             </div>
 
