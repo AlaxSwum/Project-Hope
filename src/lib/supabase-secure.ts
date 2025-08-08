@@ -843,7 +843,7 @@ export const checklistService = {
     // 2) Enrich each status with user profile, checklist, and per-task progress (with item details)
     const enriched = await Promise.all(
       statuses.map(async (s: any) => {
-        const [userRes, checklistRes, tasksRes] = await Promise.all([
+        const [userRes, checklistRes, tasksRes, allItemsRes] = await Promise.all([
           supabase
             .from('users')
             .select('id, first_name, last_name, email, role, position, phone')
@@ -859,12 +859,39 @@ export const checklistService = {
             .select('*, checklist_items(*)')
             .eq('user_id', s.user_id)
             .eq('checklist_id', s.checklist_id)
-            .eq('date_for', s.date_for)
+            .eq('date_for', s.date_for),
+          supabase
+            .from('checklist_items')
+            .select('*')
+            .eq('checklist_id', s.checklist_id)
+            .order('sort_order')
         ]);
 
         const user = userRes.data || null;
         const checklist = checklistRes.data || null;
         const tasks = tasksRes.data || [];
+        const allItems = allItemsRes.data || [];
+
+        // Ensure all checklist items appear, even if no progress row exists yet
+        const progressByItemId: Record<string, any> = {} as any;
+        for (const t of tasks) {
+          progressByItemId[t.checklist_item_id] = t;
+        }
+        const mergedTasks = allItems.map((item: any) => {
+          const p = progressByItemId[item.id];
+          if (p) return p;
+          return {
+            id: `missing-${item.id}`,
+            user_id: s.user_id,
+            checklist_id: s.checklist_id,
+            checklist_item_id: item.id,
+            completed: false,
+            completed_at: null,
+            is_required: item.is_required,
+            checklist_items: item,
+            date_for: s.date_for,
+          };
+        });
 
         // Fetch the latest branch assignment for this user to enable branch filtering in monitoring
         let branch_id: string | null = null;
@@ -885,7 +912,7 @@ export const checklistService = {
           ...s,
           user,
           checklist,
-          tasks,
+          tasks: mergedTasks,
           branch_id,
         };
       })
