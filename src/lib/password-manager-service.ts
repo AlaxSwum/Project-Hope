@@ -551,8 +551,41 @@ export const passwordManagerService = {
         error = null;
       }
 
-      if (data && data.password_encrypted) {
-        data.password = decryptPassword(data.password_encrypted);
+      // Final de-duplication and normalization regardless of source
+      if (data) {
+        const normalize = (s: string | undefined) => (s || '').trim();
+        const normalizePhone = (s: string | undefined) => normalize(s).replace(/\s+/g, '');
+        if ((data as any).phone_numbers) {
+          const seen = new Set<string>();
+          (data as any).phone_numbers = (data as any).phone_numbers.filter((p: any) => {
+            const key = `${normalize(p.phone_label)}|${normalizePhone(p.phone_number)}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        }
+        if ((data as any).email_addresses) {
+          const seen = new Set<string>();
+          (data as any).email_addresses = (data as any).email_addresses.filter((e: any) => {
+            const key = `${normalize(e.email_label)}|${normalize(e.email_address)}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        }
+        if ((data as any).custom_fields) {
+          const seen = new Set<string>();
+          (data as any).custom_fields = (data as any).custom_fields.filter((f: any) => {
+            const key = `${normalize(f.field_name)}|${normalize(f.field_value)}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        }
+      }
+
+      if (data && (data as any).password_encrypted) {
+        (data as any).password = decryptPassword((data as any).password_encrypted);
       }
 
       // Decrypt custom field values if they're encrypted
