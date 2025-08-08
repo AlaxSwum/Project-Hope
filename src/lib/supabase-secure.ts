@@ -745,7 +745,7 @@ export const checklistService = {
       .from('checklist_items')
       .select('*')
       .eq('checklist_id', checklistId)
-      .order('order_index');
+      .order('sort_order');
     return { data, error };
   },
 
@@ -839,10 +839,10 @@ export const checklistService = {
 
   async reorderChecklistItems(checklistId: string, items: any[]) {
     // Update order_index for each item
-    const updates = items.map((item, index) => 
+    const updates = items.map((item, index) =>
       supabase
         .from('checklist_items')
-        .update({ order_index: index })
+        .update({ sort_order: item.sort_order ?? index })
         .eq('id', item.id)
     );
     
