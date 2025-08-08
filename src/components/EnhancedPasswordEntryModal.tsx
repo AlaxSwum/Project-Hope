@@ -503,7 +503,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
               ) : (
                 <div className="space-y-3">
                   {phoneNumbers.map((phone, index) => (
-                    <div key={`phone-${index}-${phone.phone_number || 'new'}`} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-md">
+                    <div key={phone.id || `phone-${index}`} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-md">
                       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -584,7 +584,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
               ) : (
                 <div className="space-y-3">
                   {emailAddresses.map((email, index) => (
-                    <div key={`email-${index}-${email.email_address || 'new'}`} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-md">
+                    <div key={email.id || `email-${index}`} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-md">
                       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -665,7 +665,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
               ) : (
                 <div className="space-y-3">
                   {customFields.map((field, index) => (
-                    <div key={`field-${index}-${field.field_name || 'new'}`} className="p-3 border border-gray-200 rounded-md">
+                    <div key={field.id || `field-${index}`} className="p-3 border border-gray-200 rounded-md">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
