@@ -48,17 +48,40 @@ export interface PasswordFolder {
   can_manage?: boolean;
 }
 
+export interface PhoneNumber {
+  id?: string;
+  phone_number: string;
+  phone_label: string;
+  is_primary: boolean;
+}
+
+export interface EmailAddress {
+  id?: string;
+  email_address: string;
+  email_label: string;
+  is_primary: boolean;
+}
+
+export interface CustomField {
+  id?: string;
+  field_name: string;
+  field_value: string;
+  field_type: 'text' | 'password' | 'email' | 'url' | 'number' | 'date' | 'boolean';
+  is_encrypted: boolean;
+  field_order: number;
+}
+
 export interface PasswordEntry {
   id: string;
   folder_id: string;
   name: string;
   website_url?: string;
   website_name?: string;
-  email?: string;
+  email?: string; // Backward compatibility - will be moved to email_addresses array
   username?: string;
   password?: string; // Decrypted password for display
   password_encrypted?: string; // Encrypted password for storage
-  phone_number?: string;
+  phone_number?: string; // Backward compatibility - will be moved to phone_numbers array
   authenticator_key?: string;
   notes?: string;
   created_by: string;
@@ -68,6 +91,10 @@ export interface PasswordEntry {
   folder_color?: string;
   can_edit?: boolean;
   can_manage?: boolean;
+  // Enhanced fields
+  phone_numbers?: PhoneNumber[];
+  email_addresses?: EmailAddress[];
+  custom_fields?: CustomField[];
   shared_users?: Array<{
     user_id: string;
     user_name: string;
@@ -172,7 +199,8 @@ export const passwordManagerService = {
     try {
       const entryToInsert = {
         ...entry,
-        password_encrypted: entry.password ? encryptPassword(entry.password) : undefined,
+        // Only encrypt and store password if it's not empty
+        password_encrypted: entry.password && entry.password.trim() ? encryptPassword(entry.password.trim()) : null,
         created_by: (await supabase.auth.getUser()).data.user?.id
       };
 
@@ -195,9 +223,13 @@ export const passwordManagerService = {
     try {
       const updatesToSave = { ...updates };
 
-      // Encrypt password if provided
-      if (updates.password) {
-        (updatesToSave as any).password_encrypted = encryptPassword(updates.password);
+      // Encrypt password if provided and not empty, otherwise set to null
+      if ('password' in updates) {
+        if (updates.password && updates.password.trim()) {
+          (updatesToSave as any).password_encrypted = encryptPassword(updates.password.trim());
+        } else {
+          (updatesToSave as any).password_encrypted = null;
+        }
         delete (updatesToSave as any).password;
       }
 
@@ -372,5 +404,287 @@ export const passwordManagerService = {
     const strength = score <= 2 ? 'weak' : score <= 3 ? 'fair' : score <= 4 ? 'good' : 'strong';
 
     return { score, feedback, strength };
+  },
+
+  // Enhanced field management
+  async getPasswordEntryWithEnhancedFields(entryId: string): Promise<{ data: PasswordEntry | null; error: any }> {
+    try {
+      // Try to use the full details view first, fall back to manual queries if view doesn't exist
+      let { data, error } = await supabase
+        .from('password_entries_full_details')
+        .select('*')
+        .eq('id', entryId)
+        .single();
+
+      // If view doesn't exist, build the data manually
+      if (error && error.message?.includes('does not exist')) {
+        // Get basic entry data
+        const { data: entryData, error: entryError } = await supabase
+          .from('password_entries')
+          .select(`
+            *,
+            password_folders!inner(name, color)
+          `)
+          .eq('id', entryId)
+          .single();
+
+        if (entryError) return { data: null, error: entryError };
+
+        // Get phone numbers
+        const { data: phoneData } = await supabase
+          .from('password_entry_phones')
+          .select('*')
+          .eq('password_entry_id', entryId)
+          .order('is_primary', { ascending: false })
+          .order('phone_label');
+
+        // Get email addresses
+        const { data: emailData } = await supabase
+          .from('password_entry_emails')
+          .select('*')
+          .eq('password_entry_id', entryId)
+          .order('is_primary', { ascending: false })
+          .order('email_label');
+
+        // Get custom fields
+        const { data: customFieldData } = await supabase
+          .from('password_entry_custom_fields')
+          .select('*')
+          .eq('password_entry_id', entryId)
+          .order('field_order')
+          .order('field_name');
+
+        // Combine the data
+        data = {
+          ...entryData,
+          folder_name: entryData.password_folders?.name,
+          folder_color: entryData.password_folders?.color,
+          phone_numbers: phoneData || [],
+          email_addresses: emailData || [],
+          custom_fields: customFieldData || []
+        };
+        error = null;
+      }
+
+      if (data && data.password_encrypted) {
+        data.password = decryptPassword(data.password_encrypted);
+      }
+
+      // Decrypt custom field values if they're encrypted
+      if (data && data.custom_fields) {
+        data.custom_fields = data.custom_fields.map((field: any) => ({
+          ...field,
+          field_value: field.is_encrypted ? decryptPassword(field.field_value) : field.field_value
+        }));
+      }
+
+      return { data, error };
+    } catch (error) {
+      return { data: null, error };
+    }
+  },
+
+  // Phone number management
+  async addPhoneNumber(entryId: string, phoneData: Omit<PhoneNumber, 'id'>): Promise<{ data: any; error: any }> {
+    try {
+      const { data, error } = await supabase
+        .from('password_entry_phones')
+        .insert([{
+          password_entry_id: entryId,
+          ...phoneData
+        }])
+        .select()
+        .single();
+
+      return { data, error };
+    } catch (error) {
+      return { data: null, error };
+    }
+  },
+
+  async updatePhoneNumber(phoneId: string, phoneData: Partial<PhoneNumber>): Promise<{ data: any; error: any }> {
+    try {
+      const { data, error } = await supabase
+        .from('password_entry_phones')
+        .update(phoneData)
+        .eq('id', phoneId)
+        .select()
+        .single();
+
+      return { data, error };
+    } catch (error) {
+      return { data: null, error };
+    }
+  },
+
+  async deletePhoneNumber(phoneId: string): Promise<{ error: any }> {
+    try {
+      const { error } = await supabase
+        .from('password_entry_phones')
+        .delete()
+        .eq('id', phoneId);
+
+      return { error };
+    } catch (error) {
+      return { error };
+    }
+  },
+
+  // Email address management
+  async addEmailAddress(entryId: string, emailData: Omit<EmailAddress, 'id'>): Promise<{ data: any; error: any }> {
+    try {
+      const { data, error } = await supabase
+        .from('password_entry_emails')
+        .insert([{
+          password_entry_id: entryId,
+          ...emailData
+        }])
+        .select()
+        .single();
+
+      return { data, error };
+    } catch (error) {
+      return { data: null, error };
+    }
+  },
+
+  async updateEmailAddress(emailId: string, emailData: Partial<EmailAddress>): Promise<{ data: any; error: any }> {
+    try {
+      const { data, error } = await supabase
+        .from('password_entry_emails')
+        .update(emailData)
+        .eq('id', emailId)
+        .select()
+        .single();
+
+      return { data, error };
+    } catch (error) {
+      return { data: null, error };
+    }
+  },
+
+  async deleteEmailAddress(emailId: string): Promise<{ error: any }> {
+    try {
+      const { error } = await supabase
+        .from('password_entry_emails')
+        .delete()
+        .eq('id', emailId);
+
+      return { error };
+    } catch (error) {
+      return { error };
+    }
+  },
+
+  // Custom field management
+  async addCustomField(entryId: string, fieldData: Omit<CustomField, 'id'>): Promise<{ data: any; error: any }> {
+    try {
+      const fieldToInsert = {
+        password_entry_id: entryId,
+        ...fieldData,
+        // Encrypt the field value if it's marked as encrypted
+        field_value: fieldData.is_encrypted ? encryptPassword(fieldData.field_value) : fieldData.field_value
+      };
+
+      const { data, error } = await supabase
+        .from('password_entry_custom_fields')
+        .insert([fieldToInsert])
+        .select()
+        .single();
+
+      return { data, error };
+    } catch (error) {
+      return { data: null, error };
+    }
+  },
+
+  async updateCustomField(fieldId: string, fieldData: Partial<CustomField>): Promise<{ data: any; error: any }> {
+    try {
+      const updateData = { ...fieldData };
+      
+      // Encrypt the field value if it's marked as encrypted
+      if ('field_value' in fieldData && fieldData.is_encrypted) {
+        updateData.field_value = encryptPassword(fieldData.field_value as string);
+      }
+
+      const { data, error } = await supabase
+        .from('password_entry_custom_fields')
+        .update(updateData)
+        .eq('id', fieldId)
+        .select()
+        .single();
+
+      return { data, error };
+    } catch (error) {
+      return { data: null, error };
+    }
+  },
+
+  async deleteCustomField(fieldId: string): Promise<{ error: any }> {
+    try {
+      const { error } = await supabase
+        .from('password_entry_custom_fields')
+        .delete()
+        .eq('id', fieldId);
+
+      return { error };
+    } catch (error) {
+      return { error };
+    }
+  },
+
+  // Bulk management for enhanced fields
+  async saveEnhancedFields(entryId: string, enhancedData: {
+    phone_numbers?: PhoneNumber[];
+    email_addresses?: EmailAddress[];
+    custom_fields?: CustomField[];
+  }): Promise<{ error: any }> {
+    try {
+      // This is a simplified version - in a production app, you'd want to handle this more atomically
+      const errors: any[] = [];
+
+      // Handle phone numbers
+      if (enhancedData.phone_numbers) {
+        for (const phone of enhancedData.phone_numbers) {
+          if (phone.id) {
+            const { error } = await this.updatePhoneNumber(phone.id, phone);
+            if (error) errors.push(error);
+          } else {
+            const { error } = await this.addPhoneNumber(entryId, phone);
+            if (error) errors.push(error);
+          }
+        }
+      }
+
+      // Handle email addresses
+      if (enhancedData.email_addresses) {
+        for (const email of enhancedData.email_addresses) {
+          if (email.id) {
+            const { error } = await this.updateEmailAddress(email.id, email);
+            if (error) errors.push(error);
+          } else {
+            const { error } = await this.addEmailAddress(entryId, email);
+            if (error) errors.push(error);
+          }
+        }
+      }
+
+      // Handle custom fields
+      if (enhancedData.custom_fields) {
+        for (const field of enhancedData.custom_fields) {
+          if (field.id) {
+            const { error } = await this.updateCustomField(field.id, field);
+            if (error) errors.push(error);
+          } else {
+            const { error } = await this.addCustomField(entryId, field);
+            if (error) errors.push(error);
+          }
+        }
+      }
+
+      return { error: errors.length > 0 ? errors : null };
+    } catch (error) {
+      return { error };
+    }
   }
 };
