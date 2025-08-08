@@ -299,6 +299,21 @@ const AdminDashboard: NextPage = () => {
     }
   };
 
+  // Quick action: promote a user to administrator
+  const handleMakeAdministrator = async (user: any) => {
+    try {
+      const { error } = await userService.updateUser(user.id, { role: 'administrator' });
+      if (error) {
+        alert('Failed to make administrator: ' + (error?.message || 'Unknown error'));
+        return;
+      }
+      await loadUsers();
+      alert('User promoted to Administrator');
+    } catch (e: any) {
+      alert('Failed to make administrator: ' + (e?.message || 'Unknown error'));
+    }
+  };
+
   // Folder and checklist management functions
   const handleDeleteFolder = async (folderId: string, folderName: string) => {
     if (!confirm(`Are you sure you want to delete the folder "${folderName}"? This will also delete all checklists inside it.`)) {
@@ -1768,6 +1783,16 @@ const AdminDashboard: NextPage = () => {
                                       </svg>
                                Edit
                              </button>
+                                    <button
+                                      onClick={() => handleMakeAdministrator(user)}
+                                      className="text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-3 py-2 rounded-lg transition-colors flex items-center"
+                                      title="Make Administrator"
+                                    >
+                                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                      Admin
+                                    </button>
                              {user.role !== 'administrator' && (
                                <button 
                                  onClick={() => handleDeleteUser(user.id)}
