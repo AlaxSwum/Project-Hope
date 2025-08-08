@@ -802,10 +802,9 @@ export const checklistService = {
 
   async getAllUsersProgress(date: string) {
     const { data, error } = await supabase
-      .from('user_progress')
-      .select('*, user_profiles(*), checklist_items(*)')
-      .gte('completed_at', date)
-      .lt('completed_at', date + 'T23:59:59');
+      .from('user_daily_checklist_status')
+      .select('*')
+      .eq('date_for', date);
     return { data, error };
   },
 
