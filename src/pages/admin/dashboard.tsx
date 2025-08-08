@@ -12,7 +12,7 @@ import BranchTimeManagement from '../../components/BranchTimeManagement';
 import AssignStaffModal from '../../components/AssignStaffModal';
 import HolidayManagement from '../../components/HolidayManagement';
 import { PasswordFolderModal } from '../../components/PasswordFolderModal';
-import { PasswordEntryModal } from '../../components/PasswordEntryModal';
+import { EnhancedPasswordEntryModal } from '../../components/EnhancedPasswordEntryModal';
 import { PasswordDetailsModal } from '../../components/PasswordDetailsModal';
 import { PasswordShareModal } from '../../components/PasswordShareModal';
 import { toast } from 'react-toastify';
@@ -3443,7 +3443,7 @@ const AdminDashboard: NextPage = () => {
           mode="edit"
         />
 
-        <PasswordEntryModal
+        <EnhancedPasswordEntryModal
           isOpen={showCreatePasswordEntry}
           onClose={() => setShowCreatePasswordEntry(false)}
           onSave={handleCreatePasswordEntry}
@@ -3452,7 +3452,7 @@ const AdminDashboard: NextPage = () => {
           folders={passwordFolders}
         />
 
-        <PasswordEntryModal
+        <EnhancedPasswordEntryModal
           isOpen={showEditPasswordEntry}
           onClose={() => {
             setShowEditPasswordEntry(false);
