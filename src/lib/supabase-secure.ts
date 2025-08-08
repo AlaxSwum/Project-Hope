@@ -893,6 +893,12 @@ export const checklistService = {
           };
         });
 
+        // Recalculate completion stats with merged task list
+        const totalItems = mergedTasks.length;
+        const completedItems = mergedTasks.filter((t: any) => !!t.completed).length;
+        const completionPercentage = totalItems > 0 ? (completedItems * 100) / totalItems : 0;
+        const isFullyCompleted = totalItems > 0 && completedItems === totalItems;
+
         // Fetch the latest branch assignment for this user to enable branch filtering in monitoring
         let branch_id: string | null = null;
         try {
@@ -913,6 +919,12 @@ export const checklistService = {
           user,
           checklist,
           tasks: mergedTasks,
+          // Override status numbers so UI reflects new tasks immediately
+          total_items: totalItems,
+          completed_items: completedItems,
+          completion_percentage: completionPercentage,
+          is_fully_completed: isFullyCompleted,
+          completed_at: isFullyCompleted ? s.completed_at : null,
           branch_id,
         };
       })
