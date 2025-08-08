@@ -866,11 +866,27 @@ export const checklistService = {
         const checklist = checklistRes.data || null;
         const tasks = tasksRes.data || [];
 
+        // Fetch the latest branch assignment for this user to enable branch filtering in monitoring
+        let branch_id: string | null = null;
+        try {
+          const { data: assignment } = await supabase
+            .from('branch_staff_assignments')
+            .select('branch_id')
+            .eq('user_id', s.user_id)
+            .order('assignment_date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          branch_id = assignment?.branch_id || null;
+        } catch (_) {
+          branch_id = null;
+        }
+
         return {
           ...s,
           user,
           checklist,
           tasks,
+          branch_id,
         };
       })
     );

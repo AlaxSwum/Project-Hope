@@ -433,16 +433,9 @@ const AdminDashboard: NextPage = () => {
 
   const handleBranchMonitoringSelect = async (branch: any) => {
     setSelectedBranchForMonitoring(branch);
-    // Load staff for this branch and their progress
-    const { data: staffAssignments } = await branchService.getBranchStaff(branch.id);
-    if (staffAssignments) {
-      // Filter allUsersProgress to only show staff assigned to this branch
-      const branchStaffIds = staffAssignments.map((assignment: any) => assignment.user_id);
-      const branchProgress = allUsersProgress.filter(progress => 
-        branchStaffIds.includes(progress.user_id)
-      );
-      setBranchStaffProgress(branchProgress);
-    }
+    // Use branch_id from enriched progress data
+    const branchProgress = allUsersProgress.filter(progress => progress.branch_id === branch.id);
+    setBranchStaffProgress(branchProgress);
   };
 
   const handleBackToBranchList = () => {
@@ -2295,13 +2288,7 @@ const AdminDashboard: NextPage = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                               {branches.map((branch) => {
                                 // Calculate staff progress for this branch
-                                const branchStaffIds = allUsersProgress
-                                  .filter(progress => progress.user?.branch_assignments?.some((assignment: any) => assignment.branch_id === branch.id))
-                                  .map(progress => progress.user_id);
-                                
-                                const branchProgress = allUsersProgress.filter(progress => 
-                                  branchStaffIds.includes(progress.user_id)
-                                );
+                                const branchProgress = allUsersProgress.filter(progress => progress.branch_id === branch.id);
                                 
                                 const totalStaff = new Set(branchProgress.map(p => p.user_id)).size;
                                 const completedAssignments = branchProgress.filter(p => p.is_fully_completed).length;
