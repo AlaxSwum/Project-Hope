@@ -826,11 +826,56 @@ export const checklistService = {
   },
 
   async getAllUsersProgress(date: string) {
-    const { data, error } = await supabase
+    // 1) Load daily checklist status rows for the selected date
+    const { data: statuses, error: statusErr } = await supabase
       .from('user_daily_checklist_status')
       .select('*')
       .eq('date_for', date);
-    return { data, error };
+
+    if (statusErr) {
+      return { data: null, error: statusErr };
+    }
+
+    if (!statuses || statuses.length === 0) {
+      return { data: [], error: null };
+    }
+
+    // 2) Enrich each status with user profile, checklist, and per-task progress (with item details)
+    const enriched = await Promise.all(
+      statuses.map(async (s: any) => {
+        const [userRes, checklistRes, tasksRes] = await Promise.all([
+          supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('user_id', s.user_id)
+            .single(),
+          supabase
+            .from('checklists')
+            .select('*')
+            .eq('id', s.checklist_id)
+            .single(),
+          supabase
+            .from('user_checklist_progress')
+            .select('*, checklist_items(*)')
+            .eq('user_id', s.user_id)
+            .eq('checklist_id', s.checklist_id)
+            .eq('date_for', s.date_for)
+        ]);
+
+        const user = userRes.data || null;
+        const checklist = checklistRes.data || null;
+        const tasks = tasksRes.data || [];
+
+        return {
+          ...s,
+          user,
+          checklist,
+          tasks,
+        };
+      })
+    );
+
+    return { data: enriched, error: null };
   },
 
   async createFolder(folderData: any) {
