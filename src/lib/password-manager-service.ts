@@ -223,6 +223,23 @@ export const passwordManagerService = {
     try {
       const updatesToSave = { ...updates };
 
+      // Extract enhanced fields that should be saved separately
+      const enhancedFields = {
+        phone_numbers: updates.phone_numbers,
+        email_addresses: updates.email_addresses,
+        custom_fields: updates.custom_fields
+      };
+
+      // Remove enhanced fields from the main update (they don't belong in password_entries table)
+      delete (updatesToSave as any).phone_numbers;
+      delete (updatesToSave as any).email_addresses;
+      delete (updatesToSave as any).custom_fields;
+      delete (updatesToSave as any).shared_users; // This is also not a column in password_entries
+      delete (updatesToSave as any).folder_name; // This is from a join, not a column
+      delete (updatesToSave as any).folder_color; // This is from a join, not a column
+      delete (updatesToSave as any).can_edit; // This is computed, not a column
+      delete (updatesToSave as any).can_manage; // This is computed, not a column
+
       // Encrypt password if provided and not empty, otherwise set to null
       if ('password' in updates) {
         if (updates.password && updates.password.trim()) {
@@ -233,12 +250,25 @@ export const passwordManagerService = {
         delete (updatesToSave as any).password;
       }
 
+      // Update the main password entry
       const { data, error } = await supabase
         .from('password_entries')
         .update(updatesToSave)
         .eq('id', id)
         .select()
         .single();
+
+      if (error) {
+        return { data: null, error };
+      }
+
+      // Save enhanced fields separately if any were provided
+      if (enhancedFields.phone_numbers || enhancedFields.email_addresses || enhancedFields.custom_fields) {
+        const { error: enhancedError } = await this.saveEnhancedFields(id, enhancedFields);
+        if (enhancedError) {
+          console.warn('Enhanced fields save warning:', enhancedError);
+        }
+      }
 
       return { data, error };
     } catch (error) {
