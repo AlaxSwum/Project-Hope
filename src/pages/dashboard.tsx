@@ -1099,8 +1099,15 @@ const Dashboard: NextPage = () => {
                                 {passwords.map((password) => (
                                   <div
                                     key={password.id}
-                                    onClick={() => {
-                                      setSelectedPassword(password);
+                                    onClick={async () => {
+                                      // Load the full entry with enhanced fields
+                                      const { data: fullEntry, error } = await passwordManagerService.getPasswordEntryWithEnhancedFields(password.id);
+                                      if (error) {
+                                        console.error('Error loading password details:', error);
+                                        setSelectedPassword(password); // Fallback to basic entry
+                                      } else {
+                                        setSelectedPassword(fullEntry);
+                                      }
                                       setShowPasswordDetails(true);
                                     }}
                                     className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"

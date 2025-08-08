@@ -746,8 +746,14 @@ const AdminDashboard: NextPage = () => {
     loadPasswordEntries(folder.id);
   };
 
-  const handlePasswordEntrySelect = (entry: PasswordEntry) => {
-    setSelectedPasswordEntry(entry);
+  const handlePasswordEntrySelect = async (entry: PasswordEntry) => {
+    // Load the full entry with enhanced fields
+    const { data: fullEntry, error } = await passwordManagerService.getPasswordEntryWithEnhancedFields(entry.id);
+    if (error) {
+      toast.error('Error loading password details: ' + error.message);
+      return;
+    }
+    setSelectedPasswordEntry(fullEntry);
     setShowPasswordDetails(true);
   };
 

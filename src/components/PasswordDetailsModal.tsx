@@ -246,8 +246,131 @@ export const PasswordDetailsModal: React.FC<PasswordDetailsModalProps> = ({
             </div>
           </div>
 
-          {/* Additional Information */}
-          {(entry.phone_number || entry.authenticator_key) && (
+          {/* Phone Numbers */}
+          {(entry.phone_numbers && entry.phone_numbers.length > 0) && (
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-3 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+                Phone Numbers ({entry.phone_numbers.length})
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {entry.phone_numbers.map((phone, index) => (
+                  <div key={index} className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        {phone.phone_label}
+                        {phone.is_primary && (
+                          <span className="ml-1 text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">Primary</span>
+                        )}
+                      </label>
+                      <button
+                        onClick={() => copyToClipboard(phone.phone_number, `phone_${index}`)}
+                        className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                        title="Copy to clipboard"
+                      >
+                        {copiedField === `phone_${index}` ? (
+                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                    <span className="text-gray-900">{phone.phone_number}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Email Addresses */}
+          {(entry.email_addresses && entry.email_addresses.length > 0) && (
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-3 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                </svg>
+                Email Addresses ({entry.email_addresses.length})
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {entry.email_addresses.map((email, index) => (
+                  <div key={index} className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        {email.email_label}
+                        {email.is_primary && (
+                          <span className="ml-1 text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded">Primary</span>
+                        )}
+                      </label>
+                      <button
+                        onClick={() => copyToClipboard(email.email_address, `email_${index}`)}
+                        className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                        title="Copy to clipboard"
+                      >
+                        {copiedField === `email_${index}` ? (
+                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                    <span className="text-gray-900">{email.email_address}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Custom Fields */}
+          {(entry.custom_fields && entry.custom_fields.length > 0) && (
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-3 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Custom Fields ({entry.custom_fields.length})
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {entry.custom_fields.map((field, index) => (
+                  <div key={index} className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        {field.field_name}
+                      </label>
+                      <button
+                        onClick={() => copyToClipboard(field.field_value, `custom_${index}`)}
+                        className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                        title="Copy to clipboard"
+                      >
+                        {copiedField === `custom_${index}` ? (
+                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                    <span className="text-gray-900">{field.field_value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Legacy phone number and authenticator - only show if no enhanced fields */}
+          {(!entry.phone_numbers || entry.phone_numbers.length === 0) && (entry.phone_number || entry.authenticator_key) && (
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-3 flex items-center">
                 <svg className="w-5 h-5 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -295,7 +418,7 @@ export const PasswordDetailsModal: React.FC<PasswordDetailsModalProps> = ({
                           </svg>
                         ) : (
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                           </svg>
                         )}
                       </button>
