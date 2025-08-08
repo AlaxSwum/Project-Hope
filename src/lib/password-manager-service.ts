@@ -197,15 +197,34 @@ export const passwordManagerService = {
 
   async createPasswordEntry(entry: Omit<PasswordEntry, 'id' | 'created_at' | 'updated_at' | 'created_by'>): Promise<{ data: any; error: any }> {
     try {
-      const entryToInsert = {
+      // Extract enhanced fields to save in related tables
+      const enhancedFields = {
+        phone_numbers: (entry as any).phone_numbers,
+        email_addresses: (entry as any).email_addresses,
+        custom_fields: (entry as any).custom_fields,
+      } as {
+        phone_numbers?: PhoneNumber[];
+        email_addresses?: EmailAddress[];
+        custom_fields?: CustomField[];
+      };
+
+      const entryToInsert: any = {
         ...entry,
         // Only encrypt and store password if it's not empty
         password_encrypted: entry.password && entry.password.trim() ? encryptPassword(entry.password.trim()) : null,
-        created_by: (await supabase.auth.getUser()).data.user?.id
+        created_by: (await supabase.auth.getUser()).data.user?.id,
       };
 
-      // Remove the plain password field before inserting
-      delete (entryToInsert as any).password;
+      // Remove fields that are not columns in password_entries
+      delete entryToInsert.password; // plaintext
+      delete entryToInsert.phone_numbers;
+      delete entryToInsert.email_addresses;
+      delete entryToInsert.custom_fields;
+      delete entryToInsert.shared_users;
+      delete entryToInsert.folder_name;
+      delete entryToInsert.folder_color;
+      delete entryToInsert.can_edit;
+      delete entryToInsert.can_manage;
 
       const { data, error } = await supabase
         .from('password_entries')
@@ -213,7 +232,23 @@ export const passwordManagerService = {
         .select()
         .single();
 
-      return { data, error };
+      if (error || !data?.id) {
+        return { data, error };
+      }
+
+      // Save enhanced fields if provided
+      if (
+        enhancedFields.phone_numbers !== undefined ||
+        enhancedFields.email_addresses !== undefined ||
+        enhancedFields.custom_fields !== undefined
+      ) {
+        const { error: enhancedError } = await this.saveEnhancedFields(data.id, enhancedFields);
+        if (enhancedError) {
+          return { data: null, error: enhancedError };
+        }
+      }
+
+      return { data, error: null };
     } catch (error) {
       return { data: null, error };
     }
