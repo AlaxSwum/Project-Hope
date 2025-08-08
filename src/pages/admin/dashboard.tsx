@@ -2088,12 +2088,13 @@ const AdminDashboard: NextPage = () => {
                        </div>
                      </div>
 
-                             <button 
-                                       onClick={(e) => {
-                                         e.stopPropagation();
-                                         setSelectedChecklist(checklist);
-                                         setShowManageItems(true);
-                                       }}
+                                      <button 
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          setSelectedChecklist(checklist);
+                                          await loadChecklistItems(checklist.id);
+                                          setShowManageItems(true);
+                                        }}
                                        className="text-green-600 hover:text-green-700 text-sm font-medium"
                                      >
                                        Manage Tasks
