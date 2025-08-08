@@ -120,7 +120,7 @@ const Dashboard: NextPage = () => {
     if (!currentUser) return;
     
     try {
-      const { data, error } = await checklistService.getChecklistsForUser(currentUser.id);
+      const { data, error } = await checklistService.getChecklistsForUser(currentUser.id, userProfile?.role);
       if (error) {
         console.error('Failed to load checklists:', error);
       } else {

@@ -713,12 +713,37 @@ export const timeTrackingService = {
 
 // Checklist Service
 export const checklistService = {
-  async getChecklistsForUser(userId: string) {
-    const { data, error } = await supabase
+  async getChecklistsForUser(userId: string, userRole?: string) {
+    // Fetch checklists directly assigned to the user
+    const { data: assignedToUser, error: userErr } = await supabase
       .from('checklists')
       .select('*')
-      .eq('assigned_to', userId);
-    return { data, error };
+      .contains('target_users', [userId]);
+
+    if (userErr) {
+      return { data: null, error: userErr };
+    }
+
+    // Optionally fetch checklists assigned by role
+    let assignedByRole: any[] = [];
+    if (userRole) {
+      const { data: byRole, error: roleErr } = await supabase
+        .from('checklists')
+        .select('*')
+        .contains('target_roles', [userRole]);
+      if (roleErr) {
+        return { data: null, error: roleErr };
+      }
+      assignedByRole = byRole || [];
+    }
+
+    // Merge and de-duplicate by id
+    const combinedMap: Record<string, any> = {};
+    (assignedToUser || []).forEach((c: any) => { combinedMap[c.id] = c; });
+    assignedByRole.forEach((c: any) => { combinedMap[c.id] = c; });
+    const combined = Object.values(combinedMap);
+
+    return { data: combined, error: null };
   },
 
   async getUserProgress(userId: string) {
