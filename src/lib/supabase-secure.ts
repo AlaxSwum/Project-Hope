@@ -845,9 +845,9 @@ export const checklistService = {
       statuses.map(async (s: any) => {
         const [userRes, checklistRes, tasksRes] = await Promise.all([
           supabase
-            .from('user_profiles')
-            .select('*')
-            .eq('user_id', s.user_id)
+            .from('users')
+            .select('id, first_name, last_name, email, role, position, phone')
+            .eq('id', s.user_id)
             .single(),
           supabase
             .from('checklists')
