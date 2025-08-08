@@ -5797,15 +5797,20 @@ const EmployeeProgressCard = ({ userData, completedCount, totalCount, avgComplet
                     <h5 className="font-medium text-gray-900 mb-3">Individual Tasks</h5>
                     {progress.tasks && progress.tasks.length > 0 ? (
                       <div className="space-y-3">
-                        {progress.tasks.map((task, index) => (
-                          <div key={task.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                        {progress.tasks.map((task, index) => {
+                          const item = (task as any)?.checklist_items || task;
+                          const title = item?.title || '';
+                          const description = item?.description || '';
+                          const isCompleted = !!task.completed;
+                          return (
+                          <div key={task.id} className={`flex items-start space-x-3 p-3 rounded-lg ${isCompleted ? 'bg-gray-50' : 'bg-yellow-50'}`}>
                             <div className="flex-shrink-0 mt-0.5">
                               <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                                task.completed 
+                                isCompleted 
                                   ? 'bg-green-100 border-2 border-green-300' 
                                   : 'bg-gray-100 border-2 border-gray-300'
                               }`}>
-                                {task.completed ? (
+                                {isCompleted ? (
                                   <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                                   </svg>
@@ -5815,27 +5820,28 @@ const EmployeeProgressCard = ({ userData, completedCount, totalCount, avgComplet
                               </div>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h6 className={`font-medium ${task.completed ? 'text-green-800 line-through' : 'text-gray-900'}`}>
-                                {task.title}
+                              <h6 className={`font-medium ${isCompleted ? 'text-green-800 line-through' : 'text-gray-900'}`}>
+                                {title || 'Untitled task'}
                               </h6>
-                              {task.description && (
-                                <p className={`text-sm mt-1 ${task.completed ? 'text-green-600' : 'text-gray-600'}`}>
-                                  {task.description}
+                              {description && (
+                                <p className={`text-sm mt-1 ${isCompleted ? 'text-green-600' : 'text-gray-600'}`}>
+                                  {description}
                                 </p>
                               )}
-                              {task.completed && task.completed_at && (
+                              {isCompleted && task.completed_at && (
                                 <p className="text-xs text-green-600 mt-2">
                                   ✓ Completed at {new Date(task.completed_at).toLocaleTimeString()}
                                 </p>
                               )}
                             </div>
                             {task.is_required && (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                Required
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${isCompleted ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800' }">
+                                {isCompleted ? 'Required' : 'Remaining'}
                               </span>
                             )}
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
                       <p className="text-gray-500 text-sm">No tasks defined for this checklist.</p>
