@@ -234,10 +234,10 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
           {/* Tab Navigation */}
           <div className="mt-4 flex space-x-1 bg-gray-100 p-1 rounded-lg">
             {[
-              { id: 'basic', label: 'Basic Info', icon: '📝' },
-              { id: 'phones', label: `Phones (${phoneNumbers.length})`, icon: '📱' },
-              { id: 'emails', label: `Emails (${emailAddresses.length})`, icon: '📧' },
-              { id: 'custom', label: `Custom Fields (${customFields.length})`, icon: '⚙️' }
+              { id: 'basic', label: 'Basic Info', icon: '[i]' },
+              { id: 'phones', label: `Phones (${phoneNumbers.length})`, icon: '[P]' },
+              { id: 'emails', label: `Emails (${emailAddresses.length})`, icon: '[E]' },
+              { id: 'custom', label: `Custom Fields (${customFields.length})`, icon: '[F]' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -378,7 +378,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                       className="px-3 py-2 text-gray-400 hover:text-gray-600"
                       title={showPassword ? 'Hide password' : 'Show password'}
                     >
-                      {showPassword ? '👁️‍🗨️' : '👁️'}
+                      {showPassword ? '[hide]' : '[show]'}
                     </button>
                     <button
                       type="button"
@@ -455,7 +455,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                   onClick={addPhoneNumber}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
                 >
-                  <span className="mr-1">+</span>
+                  <span className="mr-1">[+]</span>
                   Add Phone
                 </button>
               </div>
@@ -513,7 +513,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                           className="text-red-600 hover:text-red-700 p-1"
                           title="Remove phone number"
                         >
-                          🗑️
+                          [x]
                         </button>
                       </div>
                     </div>
@@ -533,7 +533,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                   onClick={addEmailAddress}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
                 >
-                  <span className="mr-1">+</span>
+                  <span className="mr-1">[+]</span>
                   Add Email
                 </button>
               </div>
@@ -591,7 +591,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                           className="text-red-600 hover:text-red-700 p-1"
                           title="Remove email address"
                         >
-                          🗑️
+                          [x]
                         </button>
                       </div>
                     </div>
@@ -611,7 +611,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                   onClick={addCustomField}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
                 >
-                  <span className="mr-1">+</span>
+                  <span className="mr-1">[+]</span>
                   Add Custom Field
                 </button>
               </div>
@@ -670,7 +670,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                             className="text-red-600 hover:text-red-700 p-2"
                             title="Remove custom field"
                           >
-                            🗑️
+                            [x]
                           </button>
                         </div>
                       </div>
