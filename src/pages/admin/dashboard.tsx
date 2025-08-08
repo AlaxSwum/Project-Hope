@@ -788,9 +788,21 @@ const AdminDashboard: NextPage = () => {
     setShowEditPasswordFolder(true);
   };
 
-  const handleEditPasswordEntry = (entry: PasswordEntry) => {
-    setEditingPasswordEntry(entry);
-    setShowEditPasswordEntry(true);
+  const handleEditPasswordEntry = async (entry: PasswordEntry) => {
+    try {
+      // Fetch the full entry with enhanced fields
+      const { data: fullEntry, error } = await passwordManagerService.getPasswordEntryWithEnhancedFields(entry.id);
+      if (error) {
+        console.error('Failed to load full password entry:', error);
+        toast.error('Failed to load password entry details');
+        return;
+      }
+      setEditingPasswordEntry(fullEntry);
+      setShowEditPasswordEntry(true);
+    } catch (error) {
+      console.error('Error loading password entry:', error);
+      toast.error('Error loading password entry');
+    }
   };
 
   const handleUpdatePasswordFolder = async (id: string, updates: Partial<PasswordFolder>) => {
