@@ -263,10 +263,12 @@ export const passwordManagerService = {
       }
 
       // Save enhanced fields separately if any were provided
-      if (enhancedFields.phone_numbers || enhancedFields.email_addresses || enhancedFields.custom_fields) {
+      if (enhancedFields.phone_numbers !== undefined || enhancedFields.email_addresses !== undefined || enhancedFields.custom_fields !== undefined) {
+        console.log('Saving enhanced fields for entry:', id, enhancedFields);
         const { error: enhancedError } = await this.saveEnhancedFields(id, enhancedFields);
         if (enhancedError) {
-          console.warn('Enhanced fields save warning:', enhancedError);
+          console.error('Enhanced fields save error:', enhancedError);
+          return { data: null, error: enhancedError };
         }
       }
 
@@ -508,6 +510,13 @@ export const passwordManagerService = {
         }));
       }
 
+      // Log the enhanced fields structure for debugging
+      console.log('Loaded enhanced fields for entry:', entryId, {
+        phone_numbers: data?.phone_numbers,
+        email_addresses: data?.email_addresses,
+        custom_fields: data?.custom_fields
+      });
+
       return { data, error };
     } catch (error) {
       return { data: null, error };
@@ -670,12 +679,43 @@ export const passwordManagerService = {
     custom_fields?: CustomField[];
   }): Promise<{ error: any }> {
     try {
-      // This is a simplified version - in a production app, you'd want to handle this more atomically
       const errors: any[] = [];
 
       // Handle phone numbers
-      if (enhancedData.phone_numbers) {
-        for (const phone of enhancedData.phone_numbers) {
+      if (enhancedData.phone_numbers !== undefined) {
+        // Get existing phone numbers from database
+        const { data: existingPhones } = await supabase
+          .from('password_entry_phones')
+          .select('*')
+          .eq('password_entry_id', entryId);
+
+        const currentPhones = enhancedData.phone_numbers || [];
+        const existingPhoneIds = (existingPhones || []).map((p: any) => p.id);
+        const currentPhoneIds = currentPhones.filter(p => p.id).map(p => p.id);
+
+        console.log('Phone sync details:', {
+          existingPhones: existingPhones || [],
+          currentPhones,
+          existingPhoneIds,
+          currentPhoneIds
+        });
+
+        // Delete removed phone numbers
+        const phonesToDelete = existingPhoneIds.filter((id: string) => !currentPhoneIds.includes(id));
+        console.log('Phones to delete:', phonesToDelete);
+        for (const phoneId of phonesToDelete) {
+          console.log('Deleting phone:', phoneId);
+          const { error } = await this.deletePhoneNumber(phoneId);
+          if (error) {
+            console.error('Error deleting phone:', phoneId, error);
+            errors.push(error);
+          } else {
+            console.log('Successfully deleted phone:', phoneId);
+          }
+        }
+
+        // Add or update current phone numbers
+        for (const phone of currentPhones) {
           if (phone.id) {
             const { error } = await this.updatePhoneNumber(phone.id, phone);
             if (error) errors.push(error);
@@ -687,8 +727,26 @@ export const passwordManagerService = {
       }
 
       // Handle email addresses
-      if (enhancedData.email_addresses) {
-        for (const email of enhancedData.email_addresses) {
+      if (enhancedData.email_addresses !== undefined) {
+        // Get existing email addresses from database
+        const { data: existingEmails } = await supabase
+          .from('password_entry_emails')
+          .select('*')
+          .eq('password_entry_id', entryId);
+
+        const currentEmails = enhancedData.email_addresses || [];
+        const existingEmailIds = (existingEmails || []).map((e: any) => e.id);
+        const currentEmailIds = currentEmails.filter(e => e.id).map(e => e.id);
+
+        // Delete removed email addresses
+        const emailsToDelete = existingEmailIds.filter((id: string) => !currentEmailIds.includes(id));
+        for (const emailId of emailsToDelete) {
+          const { error } = await this.deleteEmailAddress(emailId);
+          if (error) errors.push(error);
+        }
+
+        // Add or update current email addresses
+        for (const email of currentEmails) {
           if (email.id) {
             const { error } = await this.updateEmailAddress(email.id, email);
             if (error) errors.push(error);
@@ -700,8 +758,26 @@ export const passwordManagerService = {
       }
 
       // Handle custom fields
-      if (enhancedData.custom_fields) {
-        for (const field of enhancedData.custom_fields) {
+      if (enhancedData.custom_fields !== undefined) {
+        // Get existing custom fields from database
+        const { data: existingFields } = await supabase
+          .from('password_entry_custom_fields')
+          .select('*')
+          .eq('password_entry_id', entryId);
+
+        const currentFields = enhancedData.custom_fields || [];
+        const existingFieldIds = (existingFields || []).map((f: any) => f.id);
+        const currentFieldIds = currentFields.filter(f => f.id).map(f => f.id);
+
+        // Delete removed custom fields
+        const fieldsToDelete = existingFieldIds.filter((id: string) => !currentFieldIds.includes(id));
+        for (const fieldId of fieldsToDelete) {
+          const { error } = await this.deleteCustomField(fieldId);
+          if (error) errors.push(error);
+        }
+
+        // Add or update current custom fields
+        for (const field of currentFields) {
           if (field.id) {
             const { error } = await this.updateCustomField(field.id, field);
             if (error) errors.push(error);

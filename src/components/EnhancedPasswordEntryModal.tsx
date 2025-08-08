@@ -53,39 +53,58 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
   const fieldTypes = ['text', 'password', 'email', 'url', 'number', 'date', 'boolean'] as const;
 
   useEffect(() => {
-    if (mode === 'edit' && entry) {
-      setFormData({
-        folder_id: entry.folder_id,
-        name: entry.name,
-        website_url: entry.website_url || '',
-        website_name: entry.website_name || '',
-        email: entry.email || '',
-        username: entry.username || '',
-        password: entry.password || '',
-        authenticator_key: entry.authenticator_key || '',
-        notes: entry.notes || ''
-      });
+    if (isOpen) {
+      if (mode === 'edit' && entry) {
+        setFormData({
+          folder_id: entry.folder_id,
+          name: entry.name,
+          website_url: entry.website_url || '',
+          website_name: entry.website_name || '',
+          email: entry.email || '',
+          username: entry.username || '',
+          password: entry.password || '',
+          authenticator_key: entry.authenticator_key || '',
+          notes: entry.notes || ''
+        });
 
-      // Set enhanced fields
-      setPhoneNumbers(entry.phone_numbers || []);
-      setEmailAddresses(entry.email_addresses || []);
-      setCustomFields(entry.custom_fields || []);
-    } else {
-      // Reset form for create mode
-      setFormData({
-        folder_id: selectedFolderId || '',
-        name: '',
-        website_url: '',
-        website_name: '',
-        email: '',
-        username: '',
-        password: '',
-        authenticator_key: '',
-        notes: ''
-      });
-      setPhoneNumbers([]);
-      setEmailAddresses([]);
-      setCustomFields([]);
+        // Set enhanced fields - ensure no duplicates by using unique keys
+        const uniquePhones = (entry.phone_numbers || []).filter((phone, index, arr) => 
+          arr.findIndex(p => p.phone_number === phone.phone_number && p.phone_label === phone.phone_label) === index
+        );
+        const uniqueEmails = (entry.email_addresses || []).filter((email, index, arr) => 
+          arr.findIndex(e => e.email_address === email.email_address && e.email_label === email.email_label) === index
+        );
+        const uniqueCustomFields = (entry.custom_fields || []).filter((field, index, arr) => 
+          arr.findIndex(f => f.field_name === field.field_name) === index
+        );
+
+        // Log what we're loading
+        console.log('Loading enhanced fields into modal:', {
+          uniquePhones,
+          uniqueEmails,
+          uniqueCustomFields
+        });
+
+        setPhoneNumbers(uniquePhones);
+        setEmailAddresses(uniqueEmails);
+        setCustomFields(uniqueCustomFields);
+      } else {
+        // Reset form for create mode
+        setFormData({
+          folder_id: selectedFolderId || '',
+          name: '',
+          website_url: '',
+          website_name: '',
+          email: '',
+          username: '',
+          password: '',
+          authenticator_key: '',
+          notes: ''
+        });
+        setPhoneNumbers([]);
+        setEmailAddresses([]);
+        setCustomFields([]);
+      }
     }
   }, [mode, entry, selectedFolderId, isOpen]);
 
@@ -119,6 +138,10 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
         email_addresses: emailAddresses,
         custom_fields: customFields
       };
+      console.log('Modal submitting enhanced entry:', enhancedEntry);
+      console.log('Current state - phoneNumbers:', phoneNumbers);
+      console.log('Current state - emailAddresses:', emailAddresses);
+      console.log('Current state - customFields:', customFields);
       await onSave(enhancedEntry);
     } finally {
       setSaving(false);
@@ -132,11 +155,14 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
 
   // Phone number management
   const addPhoneNumber = () => {
-    setPhoneNumbers([...phoneNumbers, {
+    console.log('Adding phone number, current phones:', phoneNumbers);
+    const newPhones = [...phoneNumbers, {
       phone_number: '',
       phone_label: 'Mobile',
       is_primary: phoneNumbers.length === 0
-    }]);
+    }];
+    console.log('New phones array:', newPhones);
+    setPhoneNumbers(newPhones);
   };
 
   const updatePhoneNumber = (index: number, field: keyof PhoneNumber, value: any) => {
@@ -146,7 +172,9 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
     // Ensure only one primary phone
     if (field === 'is_primary' && value) {
       updated.forEach((phone, i) => {
-        if (i !== index) phone.is_primary = false;
+        if (i !== index) {
+          phone.is_primary = false;
+        }
       });
     }
     
@@ -154,7 +182,10 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
   };
 
   const removePhoneNumber = (index: number) => {
-    setPhoneNumbers(phoneNumbers.filter((_, i) => i !== index));
+    console.log('Removing phone number at index:', index, 'current phones:', phoneNumbers);
+    const newPhones = phoneNumbers.filter((_, i) => i !== index);
+    console.log('New phones after removal:', newPhones);
+    setPhoneNumbers(newPhones);
   };
 
   // Email address management
@@ -173,7 +204,9 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
     // Ensure only one primary email
     if (field === 'is_primary' && value) {
       updated.forEach((email, i) => {
-        if (i !== index) email.is_primary = false;
+        if (i !== index) {
+          email.is_primary = false;
+        }
       });
     }
     
@@ -221,7 +254,9 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -468,7 +503,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
               ) : (
                 <div className="space-y-3">
                   {phoneNumbers.map((phone, index) => (
-                    <div key={index} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-md">
+                    <div key={`phone-${index}-${phone.phone_number || 'new'}`} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-md">
                       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -476,7 +511,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                           </label>
                           <input
                             type="tel"
-                            value={phone.phone_number}
+                            value={phone.phone_number || ''}
                             onChange={(e) => updatePhoneNumber(index, 'phone_number', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="+1234567890"
@@ -487,7 +522,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                             Label
                           </label>
                           <select
-                            value={phone.phone_label}
+                            value={phone.phone_label || 'Mobile'}
                             onChange={(e) => updatePhoneNumber(index, 'phone_label', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           >
@@ -501,7 +536,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                         <label className="flex items-center">
                           <input
                             type="checkbox"
-                            checked={phone.is_primary}
+                            checked={phone.is_primary || false}
                             onChange={(e) => updatePhoneNumber(index, 'is_primary', e.target.checked)}
                             className="mr-1"
                           />
@@ -509,11 +544,14 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                         </label>
                         <button
                           type="button"
-                          onClick={() => removePhoneNumber(index)}
-                          className="text-red-600 hover:text-red-700 p-1"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            removePhoneNumber(index);
+                          }}
+                          className="text-red-600 hover:text-red-700 p-2 bg-red-50 hover:bg-red-100 rounded transition-colors border border-red-300"
                           title="Remove phone number"
                         >
-                          [x]
+                          DELETE
                         </button>
                       </div>
                     </div>
@@ -546,7 +584,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
               ) : (
                 <div className="space-y-3">
                   {emailAddresses.map((email, index) => (
-                    <div key={index} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-md">
+                    <div key={`email-${index}-${email.email_address || 'new'}`} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-md">
                       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -554,7 +592,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                           </label>
                           <input
                             type="email"
-                            value={email.email_address}
+                            value={email.email_address || ''}
                             onChange={(e) => updateEmailAddress(index, 'email_address', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="user@example.com"
@@ -565,7 +603,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                             Label
                           </label>
                           <select
-                            value={email.email_label}
+                            value={email.email_label || 'Primary'}
                             onChange={(e) => updateEmailAddress(index, 'email_label', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           >
@@ -579,7 +617,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                         <label className="flex items-center">
                           <input
                             type="checkbox"
-                            checked={email.is_primary}
+                            checked={email.is_primary || false}
                             onChange={(e) => updateEmailAddress(index, 'is_primary', e.target.checked)}
                             className="mr-1"
                           />
@@ -587,8 +625,11 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                         </label>
                         <button
                           type="button"
-                          onClick={() => removeEmailAddress(index)}
-                          className="text-red-600 hover:text-red-700 p-1"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            removeEmailAddress(index);
+                          }}
+                          className="text-red-600 hover:text-red-700 p-1 bg-red-50 hover:bg-red-100 rounded transition-colors"
                           title="Remove email address"
                         >
                           [x]
@@ -624,7 +665,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
               ) : (
                 <div className="space-y-3">
                   {customFields.map((field, index) => (
-                    <div key={index} className="p-3 border border-gray-200 rounded-md">
+                    <div key={`field-${index}-${field.field_name || 'new'}`} className="p-3 border border-gray-200 rounded-md">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -632,7 +673,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                           </label>
                           <input
                             type="text"
-                            value={field.field_name}
+                            value={field.field_name || ''}
                             onChange={(e) => updateCustomField(index, 'field_name', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="e.g., Security Question"
@@ -643,7 +684,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                             Field Type
                           </label>
                           <select
-                            value={field.field_type}
+                            value={field.field_type || 'text'}
                             onChange={(e) => updateCustomField(index, 'field_type', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           >
@@ -658,7 +699,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                           <label className="flex items-center">
                             <input
                               type="checkbox"
-                              checked={field.is_encrypted}
+                              checked={field.is_encrypted || false}
                               onChange={(e) => updateCustomField(index, 'is_encrypted', e.target.checked)}
                               className="mr-1"
                             />
@@ -666,8 +707,11 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                           </label>
                           <button
                             type="button"
-                            onClick={() => removeCustomField(index)}
-                            className="text-red-600 hover:text-red-700 p-2"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              removeCustomField(index);
+                            }}
+                            className="text-red-600 hover:text-red-700 p-2 bg-red-50 hover:bg-red-100 rounded transition-colors"
                             title="Remove custom field"
                           >
                             [x]
@@ -680,7 +724,7 @@ export const EnhancedPasswordEntryModal: React.FC<EnhancedPasswordEntryModalProp
                         </label>
                         <input
                           type={field.field_type === 'password' ? 'password' : field.field_type === 'email' ? 'email' : field.field_type === 'url' ? 'url' : field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : 'text'}
-                          value={field.field_value}
+                          value={field.field_value || ''}
                           onChange={(e) => updateCustomField(index, 'field_value', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           placeholder="Enter field value"
