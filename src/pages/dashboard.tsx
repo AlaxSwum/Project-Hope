@@ -35,6 +35,14 @@ const Dashboard: NextPage = () => {
   const [showPasswordDetails, setShowPasswordDetails] = useState(false);
   const [loadingPasswords, setLoadingPasswords] = useState(false);
 
+  // Todo state
+  const [todoSubTab, setTodoSubTab] = useState<'list' | 'calendar'>('list');
+  const [todoLists, setTodoLists] = useState<any[]>([]);
+  const [selectedTodoList, setSelectedTodoList] = useState<any | null>(null);
+  const [todoTasks, setTodoTasks] = useState<any[]>([]);
+  const [loadingTodos, setLoadingTodos] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+
   useEffect(() => {
     checkAuth();
   }, []);
@@ -50,6 +58,10 @@ const Dashboard: NextPage = () => {
     }
     if (currentUser && activeSection === 'passwords') {
       loadUserAccessiblePasswords();
+    }
+    if (currentUser && activeSection === 'todo') {
+      loadTodoLists();
+      loadAvailableUsers();
     }
   }, [currentUser, activeSection]);
 
@@ -262,6 +274,62 @@ const Dashboard: NextPage = () => {
     }
   };
 
+  // Todo functions
+  const loadTodoLists = async () => {
+    setLoadingTodos(true);
+    try {
+      const { todoService } = await import('../lib/todo-service');
+      const { data, error } = await todoService.getLists();
+      if (error) {
+        console.error('Failed to load todo lists:', error);
+      } else {
+        setTodoLists(data || []);
+        if (!selectedTodoList && data && data.length > 0) {
+          setSelectedTodoList(data[0]);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading todo lists:', error);
+    } finally {
+      setLoadingTodos(false);
+    }
+  };
+
+  const loadTodoTasks = async (listId: string) => {
+    try {
+      const { todoService } = await import('../lib/todo-service');
+      const { data, error } = await todoService.getTasks(listId);
+      if (error) {
+        console.error('Failed to load todo tasks:', error);
+      } else {
+        setTodoTasks(data || []);
+      }
+    } catch (error) {
+      console.error('Error loading todo tasks:', error);
+    }
+  };
+
+  const loadAvailableUsers = async () => {
+    try {
+      const { todoService } = await import('../lib/todo-service');
+      const { data, error } = await todoService.getAvailableUsers();
+      if (error) {
+        console.error('Failed to load available users:', error);
+      } else {
+        setAvailableUsers(data || []);
+      }
+    } catch (error) {
+      console.error('Error loading available users:', error);
+    }
+  };
+
+  // Load tasks when selected list changes
+  useEffect(() => {
+    if (activeSection === 'todo' && selectedTodoList?.id) {
+      loadTodoTasks(selectedTodoList.id);
+    }
+  }, [activeSection, selectedTodoList?.id]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -346,6 +414,17 @@ const Dashboard: NextPage = () => {
         </svg>
       ), 
       current: activeSection === 'passwords'
+    },
+    { 
+      name: 'To-Do', 
+      id: 'todo', 
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6M9 16h6M9 8h6M5 7h.01M5 11h.01M5 15h.01" />
+        </svg>
+      ), 
+      current: activeSection === 'todo',
+      count: selectedTodoList?.open_tasks_count || 0
     },
     { 
       name: 'Reports', 
@@ -1147,6 +1226,318 @@ const Dashboard: NextPage = () => {
                       )}
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* To-Do Section */}
+              {activeSection === 'todo' && (
+                <div className="space-y-6">
+                  {/* Header */}
+                  <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h1 className="text-3xl font-bold mb-2">To-Do Lists</h1>
+                        <p className="text-indigo-100">Organize your tasks and collaborate with your team</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold">{todoTasks.filter(t => t.status !== 'done').length}</div>
+                        <div className="text-indigo-100">Open Tasks</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Main horizontal tabs: To-Do List | Calendar */}
+                  <div className="flex gap-2 border-b border-gray-200">
+                    {['list', 'calendar'].map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setTodoSubTab(tab as 'list' | 'calendar')}
+                        className={`px-6 py-3 rounded-t-xl font-medium transition-colors ${
+                          todoSubTab === tab 
+                            ? 'bg-white text-indigo-600 border-b-2 border-indigo-600' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        {tab === 'list' ? 'To-Do Lists' : 'Calendar View'}
+                      </button>
+                    ))}
+                  </div>
+
+                  {todoSubTab === 'list' ? (
+                    <div className="space-y-4">
+                      {/* Mini horizontal tabs: Lists + create */}
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex gap-2 overflow-x-auto pb-2">
+                          {todoLists.map((list) => (
+                            <button
+                              key={list.id}
+                              onClick={() => setSelectedTodoList(list)}
+                              className={`px-4 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-2 ${
+                                selectedTodoList?.id === list.id 
+                                  ? 'bg-indigo-600 text-white' 
+                                  : 'bg-white text-gray-700 border border-gray-200 hover:border-indigo-300'
+                              }`}
+                            >
+                              <div 
+                                className="w-3 h-3 rounded-full" 
+                                style={{ backgroundColor: list.color }}
+                              ></div>
+                              {list.name}
+                              {list.open_tasks_count > 0 && (
+                                <span className={`px-2 py-0.5 rounded-full text-xs ${
+                                  selectedTodoList?.id === list.id 
+                                    ? 'bg-indigo-500 text-white' 
+                                    : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {list.open_tasks_count}
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              const name = prompt('New list name?');
+                              if (!name) return;
+                              try {
+                                const { todoService } = await import('../lib/todo-service');
+                                const { data, error } = await todoService.createList({ name });
+                                if (error) {
+                                  alert('Failed to create list: ' + (error.message || 'Unknown error'));
+                                } else {
+                                  await loadTodoLists();
+                                  if (data) setSelectedTodoList(data);
+                                }
+                              } catch (error) {
+                                console.error('Error creating list:', error);
+                                alert('Failed to create list');
+                              }
+                            }}
+                            className="px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                          >
+                            + New List
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Tasks table (Asana-like) */}
+                      {selectedTodoList && (
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                          <div className="px-6 py-4 border-b border-gray-100">
+                            <div className="flex items-center justify-between">
+                              <h3 className="text-lg font-semibold text-gray-900">{selectedTodoList.name}</h3>
+                              {selectedTodoList.can_manage && (
+                                <button
+                                  onClick={async () => {
+                                    if (confirm('Are you sure you want to delete this list?')) {
+                                      try {
+                                        const { todoService } = await import('../lib/todo-service');
+                                        const { error } = await todoService.deleteList(selectedTodoList.id);
+                                        if (error) {
+                                          alert('Failed to delete list: ' + (error.message || 'Unknown error'));
+                                        } else {
+                                          await loadTodoLists();
+                                          setSelectedTodoList(null);
+                                        }
+                                      } catch (error) {
+                                        console.error('Error deleting list:', error);
+                                        alert('Failed to delete list');
+                                      }
+                                    }
+                                  }}
+                                  className="text-red-600 hover:text-red-700 text-sm"
+                                >
+                                  Delete List
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Table header (subtle, Asana-like) */}
+                          <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wide px-6 py-3 bg-gray-50 border-b border-gray-100">
+                            <div className="col-span-3">Task name</div>
+                            <div className="col-span-2">Assigned to</div>
+                            <div className="col-span-3">Description</div>
+                            <div className="col-span-2">Due date</div>
+                            <div className="col-span-1">Due time</div>
+                            <div className="col-span-1">Status</div>
+                          </div>
+
+                          {/* Tasks */}
+                          <div className="divide-y divide-gray-100">
+                            {todoTasks.map((task) => (
+                              <div key={task.id} className="grid grid-cols-12 gap-4 items-center px-6 py-4 hover:bg-gray-50 group">
+                                <div className="col-span-3">
+                                  <input
+                                    defaultValue={task.title}
+                                    className="w-full bg-transparent border-none outline-none text-gray-900 font-medium focus:bg-white focus:border focus:border-indigo-300 focus:rounded-md focus:px-2 focus:py-1"
+                                    onBlur={async (e) => {
+                                      if (e.target.value !== task.title) {
+                                        try {
+                                          const { todoService } = await import('../lib/todo-service');
+                                          await todoService.updateTask(task.id, { title: e.target.value || task.title });
+                                          await loadTodoTasks(selectedTodoList.id);
+                                        } catch (error) {
+                                          console.error('Error updating task:', error);
+                                        }
+                                      }
+                                    }}
+                                  />
+                                </div>
+                                <div className="col-span-2 text-sm text-gray-700">
+                                  {task.assigned_to_first_name || task.assigned_to_username || task.assigned_to_email || 'Me'}
+                                </div>
+                                <div className="col-span-3">
+                                  <input
+                                    defaultValue={task.description || ''}
+                                    placeholder="Add description..."
+                                    className="w-full bg-transparent border-none outline-none text-sm text-gray-600 focus:bg-white focus:border focus:border-indigo-300 focus:rounded-md focus:px-2 focus:py-1"
+                                    onBlur={async (e) => {
+                                      if (e.target.value !== (task.description || '')) {
+                                        try {
+                                          const { todoService } = await import('../lib/todo-service');
+                                          await todoService.updateTask(task.id, { description: e.target.value || null });
+                                          await loadTodoTasks(selectedTodoList.id);
+                                        } catch (error) {
+                                          console.error('Error updating task:', error);
+                                        }
+                                      }
+                                    }}
+                                  />
+                                </div>
+                                <div className="col-span-2">
+                                  <input
+                                    type="date"
+                                    defaultValue={task.due_date || ''}
+                                    className="w-full bg-transparent border-none outline-none text-sm text-gray-600 focus:bg-white focus:border focus:border-indigo-300 focus:rounded-md focus:px-1"
+                                    onChange={async (e) => {
+                                      try {
+                                        const { todoService } = await import('../lib/todo-service');
+                                        await todoService.updateTask(task.id, { due_date: e.target.value || null });
+                                        await loadTodoTasks(selectedTodoList.id);
+                                      } catch (error) {
+                                        console.error('Error updating task:', error);
+                                      }
+                                    }}
+                                  />
+                                </div>
+                                <div className="col-span-1">
+                                  <input
+                                    type="time"
+                                    defaultValue={task.due_time || ''}
+                                    className="w-full bg-transparent border-none outline-none text-sm text-gray-600 focus:bg-white focus:border focus:border-indigo-300 focus:rounded-md focus:px-1"
+                                    onChange={async (e) => {
+                                      try {
+                                        const { todoService } = await import('../lib/todo-service');
+                                        await todoService.updateTask(task.id, { due_time: e.target.value || null });
+                                        await loadTodoTasks(selectedTodoList.id);
+                                      } catch (error) {
+                                        console.error('Error updating task:', error);
+                                      }
+                                    }}
+                                  />
+                                </div>
+                                <div className="col-span-1 flex items-center gap-2">
+                                  <select
+                                    value={task.status}
+                                    onChange={async (e) => {
+                                      try {
+                                        const { todoService } = await import('../lib/todo-service');
+                                        await todoService.updateTask(task.id, { status: e.target.value as any });
+                                        await loadTodoTasks(selectedTodoList.id);
+                                        await loadTodoLists(); // Refresh open task counts
+                                      } catch (error) {
+                                        console.error('Error updating task status:', error);
+                                      }
+                                    }}
+                                    className="text-xs border-none bg-transparent outline-none focus:bg-white focus:border focus:border-indigo-300 focus:rounded"
+                                  >
+                                    <option value="open">Open</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="done">Done</option>
+                                  </select>
+                                  <button
+                                    onClick={async () => {
+                                      if (confirm('Delete this task?')) {
+                                        try {
+                                          const { todoService } = await import('../lib/todo-service');
+                                          await todoService.deleteTask(task.id);
+                                          await loadTodoTasks(selectedTodoList.id);
+                                          await loadTodoLists(); // Refresh open task counts
+                                        } catch (error) {
+                                          console.error('Error deleting task:', error);
+                                        }
+                                      }
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+
+                            {/* Add new task row */}
+                            <div className="px-6 py-4 border-t border-gray-100">
+                              <button
+                                onClick={async () => {
+                                  const title = prompt('Task name?');
+                                  if (!title) return;
+                                  try {
+                                    const { todoService } = await import('../lib/todo-service');
+                                    const { error } = await todoService.createTask(selectedTodoList.id, { title });
+                                    if (error) {
+                                      alert('Failed to create task: ' + (error.message || 'Unknown error'));
+                                    } else {
+                                      await loadTodoTasks(selectedTodoList.id);
+                                      await loadTodoLists(); // Refresh open task counts
+                                    }
+                                  } catch (error) {
+                                    console.error('Error creating task:', error);
+                                    alert('Failed to create task');
+                                  }
+                                }}
+                                className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 text-sm font-medium"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                                Add task
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {!selectedTodoList && todoLists.length === 0 && (
+                        <div className="text-center py-12">
+                          <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6M9 16h6M9 8h6M5 7h.01M5 11h.01M5 15h.01" />
+                            </svg>
+                          </div>
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">No lists yet</h3>
+                          <p className="text-gray-500 mb-4">Create your first to-do list to get started</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // Calendar tab (placeholder)
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                      <div className="text-center py-12">
+                        <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">Calendar View</h3>
+                        <p className="text-gray-500">Coming soon - View tasks organized by due date in a calendar format</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
